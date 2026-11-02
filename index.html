@@ -123,11 +123,38 @@ a { color: var(--vurgu) }
 /* alt sekme çubuğu */
 nav.sekmeler { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; background: var(--yuzey); border-top: 1px solid var(--cizgi);
   padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)) }
-nav.sekmeler div { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: repeat(4, 1fr) }
+nav.sekmeler div { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr) }
 nav.sekmeler button { border: 0; background: none; padding: 9px 0 10px; display: grid; justify-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--soluk); cursor: pointer }
 nav.sekmeler svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8 }
 nav.sekmeler button[aria-current="page"] { color: var(--vurgu) }
 @media (prefers-reduced-motion: no-preference) { .liste li { transition: background .15s } }
+
+/* portföy */
+.ozet-tablo { display: grid; gap: 6px }
+.ozet-tablo div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: baseline; font-size: 14px; padding-top: 6px; border-top: 1px solid var(--cizgi) }
+.ozet-tablo div > span:first-child { color: var(--soluk) }
+.ozet-tablo div > .kz { grid-column: 1 / -1; font-size: 12.5px }
+.buyuk-deger { font-size: 26px; font-weight: 600 }
+.pozisyon { border-top: 1px solid var(--cizgi); padding: 11px 0; display: grid; gap: 6px }
+.pozisyon:first-child { border-top: 0 }
+.poz-ust { display: flex; justify-content: space-between; align-items: baseline; gap: 8px }
+.poz-ust b { font-size: 16px }
+.poz-satir { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; font-size: 12.5px }
+.poz-satir span { display: block; color: var(--soluk); font-size: 11px }
+.fiyat-gir { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--soluk); flex-wrap: wrap }
+.fiyat-gir input { width: 130px }
+input[type="text"], input[type="date"] { width: 100%; min-width: 0; background: var(--yuzey2); border: 1px solid var(--cizgi); border-radius: 8px; padding: 9px 10px; font-size: 16px }
+.dugme { border: 0; border-radius: 9px; padding: 11px 14px; font-weight: 700; font-size: 15px; background: var(--vurgu); color: var(--vurgu-yazi); cursor: pointer }
+.dugme.ikincil { background: var(--yuzey2); color: var(--yazi); font-weight: 600 }
+.dugmeler { display: flex; gap: 8px; flex-wrap: wrap }
+.hata { color: var(--dusus); font-size: 13px; margin: 0 }
+.hata:empty { display: none }
+.islem { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid var(--cizgi); font-size: 13.5px }
+.islem:first-child { border-top: 0 }
+.islem small { display: block; color: var(--soluk); font-size: 11.5px }
+.sil { border: 0; background: none; color: var(--soluk); font-size: 22px; line-height: 1; padding: 4px 8px; cursor: pointer }
+.etiket { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 5px; margin-right: 6px }
+.etiket.al { color: var(--artis); background: var(--artis-zemin) } .etiket.sat { color: var(--dusus); background: var(--dusus-zemin) }
 </style>
 </head>
 <body>
@@ -211,6 +238,50 @@ nav.sekmeler button[aria-current="page"] { color: var(--vurgu) }
     </div>
     <div id="b-icerik" class="gorunum"><div class="kutu durum">Bir hisse seçin.</div></div>
   </section>
+  <!-- PORTFÖY -->
+  <section class="gorunum" id="v-portfoy" hidden>
+    <div class="kutu">
+      <h2>Portföyüm</h2>
+      <div class="buyuk-deger sayi" id="pf-toplam">—</div>
+      <p class="not" id="pf-toplam-alt"></p>
+      <div class="ozet-tablo" id="pf-siniflar" style="margin-top:10px"></div>
+    </div>
+    <div class="kutu">
+      <div class="segment" role="group" aria-label="Varlık türü" id="pf-sinif">
+        <button type="button" data-s="hisse" aria-pressed="true">Hisse</button>
+        <button type="button" data-s="fon" aria-pressed="false">Fon</button>
+        <button type="button" data-s="altin" aria-pressed="false">Altın</button>
+      </div>
+      <div id="pf-pozisyonlar" style="margin-top:8px"></div>
+    </div>
+    <div class="kutu">
+      <h2 id="pf-form-baslik">İşlem ekle</h2>
+      <form id="pf-form" class="filtre" novalidate>
+        <div class="segment tam" role="group" aria-label="İşlem türü" id="pf-tur">
+          <button type="button" data-t="al" aria-pressed="true">Alış</button><button type="button" data-t="sat" aria-pressed="false">Satış</button>
+        </div>
+        <div class="alan tam"><label for="pf-kod" id="pf-kod-etiket">Hisse kodu</label><input type="text" id="pf-kod" list="pf-kodlar" autocomplete="off" autocapitalize="characters" placeholder="ör. THYAO"><datalist id="pf-kodlar"></datalist></div>
+        <div class="alan"><label for="pf-tarih">Tarih</label><input type="date" id="pf-tarih"></div>
+        <div class="alan"><label for="pf-adet" id="pf-adet-etiket">Adet</label><input type="text" inputmode="decimal" id="pf-adet" placeholder="ör. 100"></div>
+        <div class="alan tam"><label for="pf-fiyat">Birim fiyat (TL)</label><input type="text" inputmode="decimal" id="pf-fiyat" placeholder="ör. 255,50"></div>
+        <div class="alan tam"><label for="pf-not">Not (isteğe bağlı)</label><input type="text" id="pf-not" placeholder="ör. komisyon dahil"></div>
+        <p class="not tam sayi" id="pf-onizleme"></p>
+        <p class="hata tam" id="pf-hata" role="alert"></p>
+        <button type="submit" class="dugme tam">Kaydet</button>
+      </form>
+    </div>
+    <div class="kutu"><h2>İşlemler</h2><div id="pf-islemler"></div></div>
+    <div class="kutu">
+      <h2>Yedek</h2>
+      <p class="not">Kayıtlar yalnızca bu telefonda, bu uygulamanın içinde durur; hiçbir sunucuya gönderilmez. iPhone'da ana ekrandaki BIST Cep ile Safari'deki sayfa ayrı depolama kullanır: kayıtları hep ana ekran simgesinden girin. Telefon değişir ya da uygulama silinirse kaybolmaması için ara sıra yedek alın.</p>
+      <div class="dugmeler" style="margin-top:10px">
+        <button type="button" class="dugme ikincil" id="pf-yedekle">Yedek al</button>
+        <button type="button" class="dugme ikincil" id="pf-yukle-dugme">Yedekten geri yükle</button>
+        <input type="file" id="pf-yukle" accept=".json,application/json" hidden>
+      </div>
+      <p class="not" id="pf-yedek-durum" style="margin-top:8px"></p>
+    </div>
+  </section>
 </main>
 
 <nav class="sekmeler" aria-label="Bölümler"><div>
@@ -218,6 +289,7 @@ nav.sekmeler button[aria-current="page"] { color: var(--vurgu) }
   <button type="button" data-v="acilis"><svg viewBox="0 0 24 24"><path d="M4 18 9 12l4 3 7-9"/><path d="M15 6h5v5"/></svg>Açılış</button>
   <button type="button" data-v="grafik"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M5 16l4-6 4 3 6-8"/></svg>Grafik</button>
   <button type="button" data-v="bilanco"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Bilanço</button>
+  <button type="button" data-v="portfoy"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="2"/><path d="M3 10h18M16 15h2M7 6V4h10v2"/></svg>Portföy</button>
 </div></nav>
 
 <script src="https://cdn.jsdelivr.net/npm/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
@@ -287,6 +359,7 @@ async function canliYenile() {
     D.sonYenileme = new Date();
     seritCiz(); filtreDoldur(); listeCiz(); acilisCiz(); seciciDoldur();
     if (!$("#v-grafik").hidden) grafikCiz(false);
+    if (!$("#v-portfoy").hidden) portfoyCiz();
   } catch (e) {
     $("#yenileme").textContent = "Fiyatlar alınamadı — bağlantıyı kontrol edin";
     if (!D.hisseler.length) $("#liste").innerHTML = `<li class="durum">${esc(e.message)}. Sayfa bir dakika içinde yeniden dener.</li>`;
@@ -583,12 +656,178 @@ function yillikCiz(b, sonCeyrek) {
     <p class="not" style="margin:10px 0 6px">Net kâr</p>${cubukSvg(kar.map(v => v ?? NaN), yillar, cssRenk("--artis"))}`;
 }
 
+// ---------------------------------------------------------------- portföy
+// Kayıtlar telefonda (localStorage). Maliyet ağırlıklı ortalama: satılan miktar ortalama maliyetten düşülür,
+// fark gerçekleşen kâr/zarardır. USD karşılığı işlem günündeki USD/TRY ile (XU100 geçmişinden: TL / USD).
+const PF_ANAHTAR = "bistcep-portfoy";
+const SINIF = { hisse: { ad: "Hisse", kod: "Hisse kodu", adet: "Adet", ornek: "ör. THYAO" },
+  fon: { ad: "Fon", kod: "Fon kodu (TEFAS)", adet: "Pay adedi", ornek: "ör. AFT" },
+  altin: { ad: "Altın", kod: "Altın türü", adet: "Miktar (gram veya adet)", ornek: "ör. Gram altın" } };
+const ALTIN_TURLERI = ["Gram altın", "Çeyrek altın", "Yarım altın", "Tam altın", "Cumhuriyet altını", "Ata altın", "22 ayar bilezik (gram)", "Gümüş (gram)"];
+let pfSinif = "hisse", pfTur = "al", kurGecmis = null;
+function pfOku() { try { const v = JSON.parse(localStorage.getItem(PF_ANAHTAR) || "null"); if (v && Array.isArray(v.islemler)) return { fiyatlar: {}, ...v } } catch {} return { v: 1, islemler: [], fiyatlar: {} } }
+let PF = pfOku();
+function pfYaz() { try { localStorage.setItem(PF_ANAHTAR, JSON.stringify(PF)); return true } catch { $("#pf-hata").textContent = "Kayıt yazılamadı (tarayıcı depolaması kapalı olabilir)."; return false } }
+try { navigator.storage?.persist?.() } catch {}
+const sayiOku = t => { t = String(t || "").trim().replace(/\s/g, ""); if (!t) return NaN;
+  if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");          // 1.234,56
+  else if (/^\d{1,3}(\.\d{3})+$/.test(t)) t = t.replace(/\./g, "");          // 3.850 → 3850 (Türkçe binlik ayıracı)
+  return Number(t) };
+const bugunISO = () => { const d = new Date(); return new Date(d - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10) };
+const tarihTR = s => s ? s.split("-").reverse().join(".") : "";
+
+async function kurGecmisYukle() {
+  if (kurGecmis) return kurGecmis;
+  try { const g = (await json("data/gecmis/XU100.json")).g; kurGecmis = { t: g.t, k: g.tl.map((v, i) => v / g.usd[i]) } }
+  catch { kurGecmis = { t: [], k: [] } }
+  return kurGecmis;
+}
+function kurTarihte(tarih) {   // o günün (yoksa önceki işlem gününün) USD/TRY'si; geçmişin sonrasıysa güncel kur
+  const g = kurGecmis; if (!g || !g.t.length || tarih > g.t[g.t.length - 1]) return D.kur?.fiyat || null;
+  if (tarih < g.t[0]) return g.k[0];
+  let a = 0, b = g.t.length - 1;
+  while (a < b) { const m = (a + b + 1) >> 1; if (g.t[m] <= tarih) a = m; else b = m - 1 }
+  return g.k[a];
+}
+function guncelFiyat(sinif, kod) {
+  if (sinif === "hisse") { const h = D.harita[kod]; if (h && h.close != null) return { fiyat: h.close, kaynak: "canlı" } }
+  const f = PF.fiyatlar[sinif + ":" + kod]; return f ? { fiyat: f.fiyat, kaynak: tarihTR(f.tarih) } : { fiyat: null, kaynak: "" };
+}
+function pozisyonlar(sinif) {
+  const g = {};
+  PF.islemler.filter(i => i.sinif === sinif).sort((a, b) => a.tarih.localeCompare(b.tarih) || a.id - b.id).forEach(i => {
+    const p = g[i.kod] ||= { kod: i.kod, adet: 0, maliyet: 0, maliyetUsd: 0, gerceklesen: 0 };
+    const kur = kurTarihte(i.tarih);
+    if (i.tur === "al") { p.adet += i.adet; p.maliyet += i.adet * i.fiyat; p.maliyetUsd += kur ? i.adet * i.fiyat / kur : NaN }
+    else {
+      const a = Math.min(i.adet, p.adet), ort = p.adet ? p.maliyet / p.adet : 0, ortU = p.adet ? p.maliyetUsd / p.adet : 0;
+      p.gerceklesen += (i.fiyat - ort) * a; p.adet -= a; p.maliyet -= ort * a; p.maliyetUsd -= ortU * a;
+      if (p.adet < 1e-9) { p.adet = 0; p.maliyet = 0; p.maliyetUsd = 0 }
+    }
+  });
+  return Object.values(g).map(p => {
+    const f = guncelFiyat(sinif, p.kod), deger = f.fiyat != null ? p.adet * f.fiyat : null;
+    return { ...p, ...f, deger, kz: deger != null ? deger - p.maliyet : null, kzUsd: deger != null && D.kur ? deger / D.kur.fiyat - p.maliyetUsd : null };
+  }).sort((a, b) => (b.deger || 0) - (a.deger || 0));
+}
+const kzYaz = (v, taban, birim = "TL") => v == null || !isFinite(v) ? "—"
+  : `<span class="sayi metin-${v >= 0 ? "art" : "dus"}">${v >= 0 ? "+" : "−"}${sayi(Math.abs(v), 2)} ${birim}${taban ? " (" + yuzde(v / taban, 1) + ")" : ""}</span>`;
+const miktar = v => sayi(v, v % 1 ? 3 : 0);
+
+async function portfoyCiz() {
+  await kurGecmisYukle();
+  // üst özet: sınıf başına değer ve kâr/zarar (fiyatı girilmemiş varlıklar toplama katılmaz)
+  let tDeger = 0, tMal = 0, tMalU = 0, tGer = 0, eksik = 0; const satirlar = [];
+  for (const s of Object.keys(SINIF)) {
+    const ps = pozisyonlar(s); if (!ps.length) continue;
+    let d = 0, m = 0, mu = 0;
+    ps.forEach(p => { tGer += p.gerceklesen; if (p.adet > 0) { if (p.deger == null) eksik++; else { d += p.deger; m += p.maliyet; mu += p.maliyetUsd } } });
+    tDeger += d; tMal += m; tMalU += mu;
+    satirlar.push(`<div><span>${SINIF[s].ad}</span><b class="sayi">${sayi(d, 0)} TL</b><span class="kz">${kzYaz(d - m, m)}</span></div>`);
+  }
+  const kayitVar = PF.islemler.length > 0, kzU = D.kur && tMalU ? tDeger / D.kur.fiyat - tMalU : null;
+  $("#pf-toplam").textContent = kayitVar ? sayi(tDeger, 0) + " TL" : "Henüz kayıt yok";
+  $("#pf-toplam-alt").innerHTML = kayitVar
+    ? `Kâr/zarar ${kzYaz(tDeger - tMal, tMal)} · USD bazında ${kzYaz(kzU, tMalU, "USD")}` + (tGer ? ` · satışlardan gerçekleşen ${kzYaz(tGer, 0)}` : "")
+      + (eksik ? ` · ${eksik} varlığın güncel fiyatı girilmediği için toplama katılmadı` : "")
+    : "Aşağıdan ilk alımınızı ekleyin. Hisse fiyatları canlı gelir; fon ve altında güncel fiyatı siz girersiniz.";
+  $("#pf-siniflar").innerHTML = satirlar.join("");
+  // seçili sınıfın pozisyonları
+  const ps = pozisyonlar(pfSinif).filter(p => p.adet > 0 || p.gerceklesen);
+  $("#pf-pozisyonlar").innerHTML = ps.length ? ps.map(p => {
+    const ort = p.adet ? p.maliyet / p.adet : null, elle = pfSinif !== "hisse" || p.kaynak !== "canlı";
+    return `<div class="pozisyon"><div class="poz-ust"><b>${esc(p.kod)}</b><span class="sayi">${p.adet === 0 ? "kapandı" : p.deger != null ? sayi(p.deger, 0) + " TL" : "güncel fiyatı girin"}</span></div>
+      <div class="poz-satir sayi"><div><span>Miktar</span>${miktar(p.adet)}</div><div><span>Ort. maliyet</span>${sayi(ort, 4)}</div>
+        <div><span>Güncel${p.kaynak ? " · " + esc(p.kaynak) : ""}</span>${sayi(p.fiyat, 4)}</div></div>
+      <div><span class="not">Kâr/zarar:</span> ${kzYaz(p.kz, p.maliyet)} · USD bazında ${kzYaz(p.kzUsd, p.maliyetUsd, "USD")}${p.gerceklesen ? ` · gerçekleşen ${kzYaz(p.gerceklesen, 0)}` : ""}</div>
+      ${elle && p.adet > 0 ? `<div class="fiyat-gir"><label for="gf-${esc(p.kod)}">Güncel fiyat (TL)</label><input type="text" inputmode="decimal" id="gf-${esc(p.kod)}" data-kod="${esc(p.kod)}" class="pf-guncel" value="${p.fiyat != null ? sayi(p.fiyat, 4) : ""}" placeholder="ör. 3,45">
+        ${pfSinif === "fon" ? `<a href="https://www.tefas.gov.tr/tr/fon-detayli-analiz/${encodeURIComponent(p.kod)}" target="_blank" rel="noopener">TEFAS'ta gör</a>` : ""}</div>` : ""}
+    </div>`; }).join("") : `<p class="durum">${SINIF[pfSinif].ad} kaydı yok.</p>`;
+  // işlem listesi (yeniden eskiye)
+  const isl = PF.islemler.filter(i => i.sinif === pfSinif).sort((a, b) => b.tarih.localeCompare(a.tarih) || b.id - a.id);
+  $("#pf-islemler").innerHTML = isl.length ? isl.map(i => `<div class="islem"><div><span class="etiket ${i.tur}">${i.tur === "al" ? "ALIŞ" : "SATIŞ"}</span><b>${esc(i.kod)}</b>
+    <small>${tarihTR(i.tarih)}${i.not ? " · " + esc(i.not) : ""}</small></div><div class="sayi" style="text-align:right">${miktar(i.adet)} × ${sayi(i.fiyat, 4)}<small>${sayi(i.adet * i.fiyat, 2)} TL</small></div>
+    <button type="button" class="sil" data-sil="${i.id}" aria-label="${esc(i.kod)} işlemini sil">×</button></div>`).join("") : `<p class="durum">İşlem yok.</p>`;
+  formHazirla();
+}
+function formHazirla() {
+  const s = SINIF[pfSinif];
+  $("#pf-kod-etiket").textContent = s.kod; $("#pf-kod").placeholder = s.ornek; $("#pf-adet-etiket").textContent = s.adet;
+  $("#pf-form-baslik").textContent = s.ad + " işlemi ekle";
+  const kodlar = pfSinif === "hisse" ? D.hisseler.filter(h => !h.xu).map(h => h.kod) : pfSinif === "altin" ? ALTIN_TURLERI
+    : [...new Set(PF.islemler.filter(i => i.sinif === "fon").map(i => i.kod))];
+  const dl = $("#pf-kodlar");
+  if (dl.dataset.sinif !== pfSinif || dl.options.length !== kodlar.length) { dl.innerHTML = kodlar.map(k => `<option value="${esc(k)}">`).join(""); dl.dataset.sinif = pfSinif }
+  if (!$("#pf-tarih").value) $("#pf-tarih").value = bugunISO();
+}
+const kodDuzelt = k => { k = k.trim(); return pfSinif === "altin" ? k : k.toLocaleUpperCase("tr") };
+$("#pf-kod").addEventListener("change", () => {   // kod seçilince fiyat önerisi: hissede bugünkü canlı fiyat, diğerlerinde son girilen
+  const k = kodDuzelt($("#pf-kod").value); $("#pf-kod").value = k;
+  if ($("#pf-fiyat").value) return;
+  if (pfSinif === "hisse") { if (D.harita[k] && $("#pf-tarih").value === bugunISO()) $("#pf-fiyat").value = sayi(D.harita[k].close, 2) }
+  else { const f = PF.fiyatlar[pfSinif + ":" + k]; if (f) $("#pf-fiyat").value = sayi(f.fiyat, 4) }
+});
+function onizle() {   // girilen sayının nasıl okunduğunu göster (3.850 / 3,85 karışmasın)
+  const a = sayiOku($("#pf-adet").value), f = sayiOku($("#pf-fiyat").value);
+  $("#pf-onizleme").textContent = a > 0 && f > 0 ? `${miktar(a)} × ${sayi(f, 4)} TL = toplam ${sayi(a * f, 2)} TL` : "";
+}
+["#pf-adet", "#pf-fiyat"].forEach(s => $(s).addEventListener("input", onizle));
+$("#pf-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const kod = kodDuzelt($("#pf-kod").value), tarih = $("#pf-tarih").value, adet = sayiOku($("#pf-adet").value), fiyat = sayiOku($("#pf-fiyat").value);
+  let hata = !kod ? "Kod veya tür girin." : !tarih ? "Tarih seçin." : tarih > bugunISO() ? "Tarih bugünden ileri olamaz."
+    : !(adet > 0) ? "Miktar sıfırdan büyük bir sayı olmalı." : !(fiyat > 0) ? "Fiyat sıfırdan büyük bir sayı olmalı."
+    : pfSinif === "hisse" && D.hisseler.length && !D.harita[kod] && !PF.islemler.some(i => i.kod === kod) ? `${kod} Borsa İstanbul listesinde bulunamadı.` : "";
+  if (!hata && pfTur === "sat") { const p = pozisyonlar(pfSinif).find(p => p.kod === kod);
+    if (!p || p.adet + 1e-9 < adet) hata = `Elinizde ${p ? miktar(p.adet) : 0} ${kod} var; daha fazlası satılamaz.` }
+  $("#pf-hata").textContent = hata; if (hata) return;
+  PF.islemler.push({ id: Date.now(), sinif: pfSinif, kod, tur: pfTur, tarih, adet, fiyat, not: $("#pf-not").value.trim() });
+  const onceki = PF.fiyatlar[pfSinif + ":" + kod];   // fon/altında en yeni işlem fiyatı, daha yeni elle girilmiş fiyat yoksa güncel fiyat olur
+  if (pfSinif !== "hisse" && (!onceki || onceki.tarih <= tarih)) PF.fiyatlar[pfSinif + ":" + kod] = { fiyat, tarih };
+  if (!pfYaz()) return;
+  ["#pf-kod", "#pf-adet", "#pf-fiyat", "#pf-not"].forEach(s => $(s).value = "");
+  $("#pf-yedek-durum").textContent = ""; onizle();
+  portfoyCiz();
+});
+document.querySelectorAll("#pf-sinif button").forEach(b => b.addEventListener("click", () => {
+  pfSinif = b.dataset.s; document.querySelectorAll("#pf-sinif button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  ["#pf-kod", "#pf-fiyat"].forEach(s => $(s).value = ""); $("#pf-hata").textContent = ""; portfoyCiz() }));
+document.querySelectorAll("#pf-tur button").forEach(b => b.addEventListener("click", () => {
+  pfTur = b.dataset.t; document.querySelectorAll("#pf-tur button").forEach(x => x.setAttribute("aria-pressed", x === b)) }));
+$("#pf-islemler").addEventListener("click", e => {
+  const b = e.target.closest("[data-sil]"); if (!b) return;
+  const i = PF.islemler.find(x => String(x.id) === b.dataset.sil); if (!i) return;
+  if (!confirm(`${tarihTR(i.tarih)} tarihli ${i.kod} ${i.tur === "al" ? "alışı" : "satışı"} silinsin mi?`)) return;
+  PF.islemler = PF.islemler.filter(x => x !== i); pfYaz(); portfoyCiz() });
+$("#pf-pozisyonlar").addEventListener("change", e => {
+  const inp = e.target.closest(".pf-guncel"); if (!inp) return;
+  const f = sayiOku(inp.value); if (!(f > 0)) { inp.value = ""; return }
+  PF.fiyatlar[pfSinif + ":" + inp.dataset.kod] = { fiyat: f, tarih: bugunISO() }; pfYaz(); portfoyCiz() });
+$("#pf-yedekle").addEventListener("click", async () => {
+  const ad = `bistcep-yedek-${bugunISO()}.json`, dosya = new File([JSON.stringify(PF, null, 1)], ad, { type: "application/json" });
+  try { if (navigator.canShare?.({ files: [dosya] })) { await navigator.share({ files: [dosya], title: "BIST Cep yedeği" });
+    $("#pf-yedek-durum").textContent = "Yedek paylaşıldı. Dosyalar'a kaydettiyseniz geri yüklerken oradan seçebilirsiniz."; return } }
+  catch (err) { if (err && err.name === "AbortError") return }
+  const a = document.createElement("a"); a.href = URL.createObjectURL(dosya); a.download = ad; document.body.append(a); a.click(); a.remove();
+  $("#pf-yedek-durum").textContent = `${ad} indirildi (${PF.islemler.length} işlem).`;
+});
+$("#pf-yukle-dugme").addEventListener("click", () => $("#pf-yukle").click());
+$("#pf-yukle").addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try {
+    const v = JSON.parse(await f.text()); if (!v || !Array.isArray(v.islemler)) throw new Error();
+    if (!confirm(`Yedekteki ${v.islemler.length} işlem yüklenecek ve bu telefondaki ${PF.islemler.length} işlemin yerini alacak. Devam edilsin mi?`)) return;
+    PF = { v: 1, islemler: v.islemler, fiyatlar: v.fiyatlar || {} }; pfYaz(); $("#pf-yedek-durum").textContent = "Yedek yüklendi."; portfoyCiz();
+  } catch { $("#pf-yedek-durum").textContent = "Bu dosya bir BIST Cep yedeği değil." }
+});
+
 // ---------------------------------------------------------------- görünümler
 function goster(v) {
-  for (const ad of ["liste", "acilis", "grafik", "bilanco"]) $("#v-" + ad).hidden = ad !== v;
+  for (const ad of ["liste", "acilis", "grafik", "bilanco", "portfoy"]) $("#v-" + ad).hidden = ad !== v;
   document.querySelectorAll("nav.sekmeler button").forEach(b => b.dataset.v === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   if (v === "grafik") grafikCiz(true);
   if (v === "bilanco") bilancoCiz();
+  if (v === "portfoy") portfoyCiz();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll("nav.sekmeler button").forEach(b => b.addEventListener("click", () => goster(b.dataset.v)));
