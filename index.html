@@ -432,7 +432,9 @@ function okumaYaz(n, son) {
   $("#o-deg").textContent = deg == null ? "" : "dönem başına göre " + yuzde(deg);
   $("#o-deg").className = "sayi metin-" + (deg >= 0 ? "art" : "dus");
 }
+let grafikSira = 0;   // geç gelen eski bir yükleme yeni seçimin üzerine çizmesin
 async function grafikCiz(veriYukle = true) {
+  const benim = ++grafikSira;
   if (!grafik) grafikKur();
   const kod = D.secili, h = D.harita[kod];
   $("#g-kod").textContent = kod;
@@ -462,6 +464,7 @@ async function grafikCiz(veriYukle = true) {
       $("#g-not").textContent = "Geçmiş: İş Yatırım düzeltilmiş kapanışları (bedelsiz/temettü düzeltmeli)" + (D.para === "USD" ? ", o günkü USD/TRY ile dolara çevrilmiş." : ".") + " Son nokta canlı fiyattır.";
     }
   } catch { noktalar = []; $("#g-not").textContent = "Bu hisse için grafik verisi henüz yok (yeni halka arz veya veri güncelleniyor)." }
+  if (benim !== grafikSira) return;
   grafikVeri = noktalar;
   grafik.applyOptions({ timeScale: { timeVisible: gunIci(), secondsVisible: false } });
   seri.setData(noktalar);
