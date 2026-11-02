@@ -369,6 +369,8 @@ async function canliYenile() {
         filter: [{ left: "type", operation: "equal", right: "stock" }, { left: "exchange", operation: "equal", right: "BIST" }] }),
       tara("forex", { columns: ["close", "change", "Perf.W", "Perf.1M", "Perf.YTD", "Perf.Y", "Perf.3Y", "Perf.5Y"], symbols: { tickers: ["FX_IDC:USDTRY"] } })]);
     const k = kur[0].d;
+    tara("cfd", { columns: ["close"], symbols: { tickers: ["OANDA:XAUUSD", "TVC:SILVER"] } })
+      .then(r => { D.ons = Object.fromEntries(r.map(x => [x.s, x.d[0]])); if (!$("#v-portfoy").hidden && pfAcik) portfoyCiz() }).catch(() => {});
     D.kur = { fiyat: k[0], KurG: k[1] / 100, KurW: k[2] / 100, Kur1M: k[3] / 100, KurYTD: k[4] / 100, KurY: k[5] / 100, Kur3Y: k[6] / 100, Kur5Y: k[7] / 100 };
     D.hisseler = [...xu, ...hisse].map(x => { const o = {}; KOLON.forEach((c, i) => o[c] = x.d[i]);
       o.kod = o.name; o.xu = o.kod === "XU100"; o.sektorTr = o.xu ? "Endeks" : (SEKTOR[o.sector] || o.sector || "Diğer");
@@ -681,6 +683,10 @@ const PF_ANAHTAR = "bistcep-portfoy";
 const SINIF = { hisse: { ad: "Hisse", kod: "Hisse kodu", adet: "Adet", ornek: "ör. THYAO" },
   fon: { ad: "Fon", kod: "Fon kodu (TEFAS)", adet: "Pay adedi", ornek: "ör. AFT" },
   altin: { ad: "Altın", kod: "Altın türü", adet: "Miktar (gram veya adet)", ornek: "ör. Gram altın" } };
+// internet referansı (has/toptan, ons × kur ÷ 31,1035 g); kuyumcu fiyatı işçilik ve makasla farklıdır
+const ONS_GRAM = 31.1035, REFERANS = { "Gram altın": ["OANDA:XAUUSD", 1], "22 ayar bilezik (gram)": ["OANDA:XAUUSD", 0.916], "Gümüş (gram)": ["TVC:SILVER", 1] };
+function referansFiyat(kod) { const r = REFERANS[kod], o = r && D.ons?.[r[0]];
+  return o && D.kur ? o / ONS_GRAM * D.kur.fiyat * r[1] : null }
 const ALTIN_TURLERI = ["Gram altın", "Çeyrek altın", "Yarım altın", "Tam altın", "Cumhuriyet altını", "Ata altın", "22 ayar bilezik (gram)", "Gümüş (gram)"];
 let pfSinif = "hisse", pfTur = "al", kurGecmis = null;
 function pfOku() { try { const v = JSON.parse(localStorage.getItem(PF_ANAHTAR) || "null"); if (v && Array.isArray(v.islemler)) return { fiyatlar: {}, ...v } } catch {} return { v: 1, islemler: [], fiyatlar: {} } }
@@ -709,7 +715,7 @@ function kurTarihte(tarih) {   // o günün (yoksa önceki işlem gününün) US
 }
 function guncelFiyat(sinif, kod) {
   if (sinif === "hisse") { const h = D.harita[kod]; if (h && h.close != null) return { fiyat: h.close, kaynak: "canlı" } }
-  const f = PF.fiyatlar[sinif + ":" + kod]; return f ? { fiyat: f.fiyat, kaynak: tarihTR(f.tarih) } : { fiyat: null, kaynak: "" };
+  const f = PF.fiyatlar[sinif + ":" + kod]; return f ? { fiyat: f.fiyat, kaynak: tarihTR(f.tarih), fiyatTarihi: f.tarih } : { fiyat: null, kaynak: "" };
 }
 function pozisyonlar(sinif) {
   const g = {};
@@ -754,12 +760,16 @@ async function portfoyCiz() {
   const ps = pozisyonlar(pfSinif).filter(p => p.adet > 0 || p.gerceklesen);
   $("#pf-pozisyonlar").innerHTML = ps.length ? ps.map(p => {
     const ort = p.adet ? p.maliyet / p.adet : null, elle = pfSinif !== "hisse" || p.kaynak !== "canlı";
+    const eski = elle && p.adet > 0 && p.fiyatTarihi && p.fiyatTarihi < bugunISO(), ref = pfSinif === "altin" ? referansFiyat(p.kod) : null;
     return `<div class="pozisyon"><div class="poz-ust"><b>${esc(p.kod)}</b><span class="sayi">${p.adet === 0 ? "kapandı" : p.deger != null ? sayi(p.deger, 0) + " TL" : "güncel fiyatı girin"}</span></div>
       <div class="poz-satir sayi"><div><span>Miktar</span>${miktar(p.adet)}</div><div><span>Ort. maliyet</span>${sayi(ort, 4)}</div>
         <div><span>Güncel${p.kaynak ? " · " + esc(p.kaynak) : ""}</span>${sayi(p.fiyat, 4)}</div></div>
       <div><span class="not">Kâr/zarar:</span> ${kzYaz(p.kz, p.maliyet)} · USD bazında ${kzYaz(p.kzUsd, p.maliyetUsd, "USD")}${p.gerceklesen ? ` · gerçekleşen ${kzYaz(p.gerceklesen, 0)}` : ""}</div>
+      ${elle && p.adet > 0 && (eski || p.fiyat === ort) ? `<p class="not" style="color:var(--imlec)">Güncel fiyat ${eski ? p.kaynak + " tarihli" : "henüz alış fiyatınıza eşit"}; kâr/zarar ancak aşağıya bugünkü fiyatı yazınca değişir.</p>` : ""}
       ${elle && p.adet > 0 ? `<div class="fiyat-gir"><label for="gf-${esc(p.kod)}">Güncel fiyat (TL)</label><input type="text" inputmode="decimal" id="gf-${esc(p.kod)}" data-kod="${esc(p.kod)}" class="pf-guncel" value="${p.fiyat != null ? sayi(p.fiyat, 4) : ""}" placeholder="ör. 3,45">
-        ${pfSinif === "fon" ? `<a href="https://www.tefas.gov.tr/tr/fon-detayli-analiz/${encodeURIComponent(p.kod)}" target="_blank" rel="noopener">TEFAS'ta gör</a>` : ""}</div>` : ""}
+        ${pfSinif === "fon" ? `<a href="https://www.tefas.gov.tr/tr/fon-detayli-analiz/${encodeURIComponent(p.kod)}" target="_blank" rel="noopener">TEFAS'ta gör</a>` : ""}</div>
+        ${ref ? `<p class="not">İnternet referansı (ons × kur, has altın): <b class="sayi">${sayi(ref, 2)} TL</b> · kuyumcu fiyatı farklıdır.
+          <button type="button" class="sil pf-ref" data-kod="${esc(p.kod)}" data-fiyat="${ref}" style="font-size:13px;padding:0 0 0 4px;text-decoration:underline;color:var(--vurgu)">Bunu kullan</button></p>` : ""}` : ""}
     </div>`; }).join("") : `<p class="durum">${SINIF[pfSinif].ad} kaydı yok.</p>`;
   // işlem listesi (yeniden eskiye)
   const isl = PF.islemler.filter(i => i.sinif === pfSinif).sort((a, b) => b.tarih.localeCompare(a.tarih) || b.id - a.id);
@@ -817,6 +827,9 @@ $("#pf-islemler").addEventListener("click", e => {
   const i = PF.islemler.find(x => String(x.id) === b.dataset.sil); if (!i) return;
   if (!confirm(`${tarihTR(i.tarih)} tarihli ${i.kod} ${i.tur === "al" ? "alışı" : "satışı"} silinsin mi?`)) return;
   PF.islemler = PF.islemler.filter(x => x !== i); pfYaz(); portfoyCiz() });
+$("#pf-pozisyonlar").addEventListener("click", e => {
+  const b = e.target.closest(".pf-ref"); if (!b) return;
+  PF.fiyatlar[pfSinif + ":" + b.dataset.kod] = { fiyat: Number(b.dataset.fiyat), tarih: bugunISO() }; pfYaz(); portfoyCiz() });
 $("#pf-pozisyonlar").addEventListener("change", e => {
   const inp = e.target.closest(".pf-guncel"); if (!inp) return;
   const f = sayiOku(inp.value); if (!(f > 0)) { inp.value = ""; return }
