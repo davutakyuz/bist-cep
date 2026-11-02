@@ -143,7 +143,7 @@ nav.sekmeler button[aria-current="page"] { color: var(--vurgu) }
 .poz-satir span { display: block; color: var(--soluk); font-size: 11px }
 .fiyat-gir { display: flex; gap: 8px; align-items: center; font-size: 12.5px; color: var(--soluk); flex-wrap: wrap }
 .fiyat-gir input { width: 130px }
-input[type="text"], input[type="date"] { width: 100%; min-width: 0; background: var(--yuzey2); border: 1px solid var(--cizgi); border-radius: 8px; padding: 9px 10px; font-size: 16px }
+input[type="text"], input[type="date"], input[type="password"] { width: 100%; min-width: 0; background: var(--yuzey2); border: 1px solid var(--cizgi); border-radius: 8px; padding: 9px 10px; font-size: 16px }
 .dugme { border: 0; border-radius: 9px; padding: 11px 14px; font-weight: 700; font-size: 15px; background: var(--vurgu); color: var(--vurgu-yazi); cursor: pointer }
 .dugme.ikincil { background: var(--yuzey2); color: var(--yazi); font-weight: 600 }
 .dugmeler { display: flex; gap: 8px; flex-wrap: wrap }
@@ -240,6 +240,18 @@ input[type="text"], input[type="date"] { width: 100%; min-width: 0; background: 
   </section>
   <!-- PORTFÖY -->
   <section class="gorunum" id="v-portfoy" hidden>
+    <div class="kutu" id="pf-kilit" hidden>
+      <h2 id="pf-kilit-baslik">Portföy kilitli</h2>
+      <p class="not" id="pf-kilit-aciklama">Şifrenizi girin.</p>
+      <form id="pf-kilit-form" class="filtre" novalidate style="margin-top:10px">
+        <div class="alan tam"><label for="pf-pin">Şifre</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" id="pf-pin"></div>
+        <div class="alan tam" id="pf-pin2-alan" hidden><label for="pf-pin2">Şifre (tekrar)</label><input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" id="pf-pin2"></div>
+        <p class="hata tam" id="pf-kilit-hata" role="alert"></p>
+        <button type="submit" class="dugme tam" id="pf-kilit-dugme">Aç</button>
+      </form>
+      <p class="not" style="margin-top:12px" id="pf-unuttum-alan"><button type="button" class="sil" id="pf-unuttum" style="font-size:13px;padding:0;text-decoration:underline">Şifremi unuttum</button></p>
+    </div>
+    <div class="gorunum" id="pf-icerik" hidden>
     <div class="kutu">
       <h2>Portföyüm</h2>
       <div class="buyuk-deger sayi" id="pf-toplam">—</div>
@@ -280,6 +292,12 @@ input[type="text"], input[type="date"] { width: 100%; min-width: 0; background: 
         <input type="file" id="pf-yukle" accept=".json,application/json" hidden>
       </div>
       <p class="not" id="pf-yedek-durum" style="margin-top:8px"></p>
+      <p class="not" style="margin-top:8px">Yedek dosyası şifresizdir; telefonun Dosyalar'ı veya iCloud gibi yalnızca sizin erişebildiğiniz bir yerde saklayın.</p>
+      <div class="dugmeler" style="margin-top:10px">
+        <button type="button" class="dugme ikincil" id="pf-kilitle">Şimdi kilitle</button>
+        <button type="button" class="dugme ikincil" id="pf-pin-degistir">Şifreyi değiştir</button>
+      </div>
+    </div>
     </div>
   </section>
 </main>
@@ -359,7 +377,7 @@ async function canliYenile() {
     D.sonYenileme = new Date();
     seritCiz(); filtreDoldur(); listeCiz(); acilisCiz(); seciciDoldur();
     if (!$("#v-grafik").hidden) grafikCiz(false);
-    if (!$("#v-portfoy").hidden) portfoyCiz();
+    if (!$("#v-portfoy").hidden && pfAcik) portfoyCiz();
   } catch (e) {
     $("#yenileme").textContent = "Fiyatlar alınamadı — bağlantıyı kontrol edin";
     if (!D.hisseler.length) $("#liste").innerHTML = `<li class="durum">${esc(e.message)}. Sayfa bir dakika içinde yeniden dener.</li>`;
@@ -821,13 +839,63 @@ $("#pf-yukle").addEventListener("change", async e => {
   } catch { $("#pf-yedek-durum").textContent = "Bu dosya bir BIST Cep yedeği değil." }
 });
 
+// ---------------------------------------------------------------- portföy kilidi
+// Şifrenin kendisi değil, rastgele tuzla SHA-256 özeti saklanır. Kilit; uygulama arka plana geçince ya da
+// 5 dk dokunulmayınca yeniden kapanır. (Kayıtlar şifrelenmez: amaç telefon başkasının elindeyken görünmemesi.)
+const PIN_ANAHTAR = "bistcep-pin", KILIT_SURE = 5 * 60 * 1000;
+let pfAcik = false, pfSonDokunma = 0, pinKurulum = null;
+const pinOku = () => { try { return JSON.parse(localStorage.getItem(PIN_ANAHTAR) || "null") } catch { return null } };
+async function pinOzet(pin, tuz) {
+  const b = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(tuz + ":" + pin));
+  return [...new Uint8Array(b)].map(x => x.toString(16).padStart(2, "0")).join("");
+}
+function kilitGoster() {
+  const kayitli = pinOku(), kur = !kayitli || pinKurulum;
+  $("#pf-icerik").hidden = true; $("#pf-kilit").hidden = false;
+  $("#pf-kilit-baslik").textContent = kur ? (kayitli ? "Yeni şifre belirleyin" : "Portföy şifresi belirleyin") : "Portföy kilitli";
+  $("#pf-kilit-aciklama").textContent = kur ? "4–6 haneli bir şifre seçin. Portföy her açılışta bu şifreyi soracak." : "Şifrenizi girin.";
+  $("#pf-pin2-alan").hidden = !kur; $("#pf-kilit-dugme").textContent = kur ? "Şifreyi kaydet" : "Aç";
+  $("#pf-unuttum-alan").hidden = !!kur; $("#pf-kilit-hata").textContent = "";
+  $("#pf-pin").value = ""; $("#pf-pin2").value = "";
+  setTimeout(() => $("#pf-pin").focus(), 50);
+}
+function portfoyGir() {
+  if (pfAcik && Date.now() - pfSonDokunma < KILIT_SURE && !pinKurulum) { pfSonDokunma = Date.now(); $("#pf-kilit").hidden = true; $("#pf-icerik").hidden = false; portfoyCiz() }
+  else { pfAcik = false; kilitGoster() }
+}
+function kilitle() { pfAcik = false; if (!$("#v-portfoy").hidden) kilitGoster() }
+$("#pf-kilit-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const pin = $("#pf-pin").value.trim(), kayitli = pinOku();
+  if (!crypto?.subtle) { $("#pf-kilit-hata").textContent = "Bu tarayıcı şifrelemeyi desteklemiyor."; return }
+  if (!kayitli || pinKurulum) {
+    if (!/^\d{4,6}$/.test(pin)) { $("#pf-kilit-hata").textContent = "Şifre 4–6 rakam olmalı."; return }
+    if (pin !== $("#pf-pin2").value.trim()) { $("#pf-kilit-hata").textContent = "İki şifre aynı değil."; return }
+    const tuz = [...crypto.getRandomValues(new Uint8Array(16))].map(x => x.toString(16).padStart(2, "0")).join("");
+    try { localStorage.setItem(PIN_ANAHTAR, JSON.stringify({ tuz, ozet: await pinOzet(pin, tuz) })) }
+    catch { $("#pf-kilit-hata").textContent = "Şifre kaydedilemedi (tarayıcı depolaması kapalı olabilir)."; return }
+    pinKurulum = null;
+  } else if (await pinOzet(pin, kayitli.tuz) !== kayitli.ozet) { $("#pf-kilit-hata").textContent = "Şifre yanlış."; $("#pf-pin").value = ""; return }
+  pfAcik = true; pfSonDokunma = Date.now(); portfoyGir();
+});
+$("#pf-unuttum").addEventListener("click", () => {
+  if (!confirm("Şifre sıfırlanınca bu telefondaki tüm portföy kayıtları silinir. Yedeğiniz varsa yeni şifreyi belirledikten sonra 'Yedekten geri yükle' ile geri getirebilirsiniz. Devam edilsin mi?")) return;
+  try { localStorage.removeItem(PIN_ANAHTAR); localStorage.removeItem(PF_ANAHTAR) } catch {}
+  PF = pfOku(); pinKurulum = null; kilitGoster();
+});
+$("#pf-kilitle").addEventListener("click", kilitle);
+$("#pf-pin-degistir").addEventListener("click", () => { pinKurulum = true; kilitGoster() });
+document.addEventListener("visibilitychange", () => { if (document.hidden) kilitle() });
+["pointerdown", "keydown"].forEach(t => document.addEventListener(t, () => { if (pfAcik) {
+  if (Date.now() - pfSonDokunma > KILIT_SURE) kilitle(); else pfSonDokunma = Date.now() } }, true));
+
 // ---------------------------------------------------------------- görünümler
 function goster(v) {
   for (const ad of ["liste", "acilis", "grafik", "bilanco", "portfoy"]) $("#v-" + ad).hidden = ad !== v;
   document.querySelectorAll("nav.sekmeler button").forEach(b => b.dataset.v === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   if (v === "grafik") grafikCiz(true);
   if (v === "bilanco") bilancoCiz();
-  if (v === "portfoy") portfoyCiz();
+  if (v === "portfoy") portfoyGir();
   window.scrollTo(0, 0);
 }
 document.querySelectorAll("nav.sekmeler button").forEach(b => b.addEventListener("click", () => goster(b.dataset.v)));
