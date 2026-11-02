@@ -1,0 +1,15 @@
+{
+  "name": "BIST Cep",
+  "short_name": "BIST Cep",
+  "description": "Borsa İstanbul hisseleri: canlı TL/USD fiyat, açılış özeti, grafik ve bilanço",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#0f3d3e",
+  "theme_color": "#0f3d3e",
+  "icons": [
+    {"src": "ikon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "ikon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ]
+}

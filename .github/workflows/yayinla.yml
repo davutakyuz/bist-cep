@@ -1,0 +1,60 @@
+name: Veriyi güncelle ve yayınla
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # Borsa saatleri (TR 10:00-18:30 = UTC 07:00-15:30), hafta içi her 20 dk; akşam bir kez geçmiş/TÜFE için
+    - cron: "*/20 7-15 * * 1-5"
+    - cron: "0 17 * * 1-5"
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  yayinla:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    environment:
+      name: github-pages
+      url: ${{ steps.dagit.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pandas
+      # geçmiş veri ve İş Yatırım ham önbelleği çalıştırmalar arasında saklanır (git'e yazılmaz)
+      - uses: actions/cache/restore@v4
+        with:
+          path: |
+            data/gecmis
+            onbellek
+          key: gecmis-${{ github.run_id }}
+          restore-keys: gecmis-
+      - id: uret
+        run: python veri_uret.py
+      - uses: actions/cache/save@v4
+        if: steps.uret.outputs.gecmis_yenilendi == 'true'
+        with:
+          path: |
+            data/gecmis
+            onbellek
+          key: gecmis-${{ github.run_id }}
+      - name: Site klasörünü hazırla
+        run: |
+          mkdir _site
+          cp index.html manifest.webmanifest ikon-*.png _site/
+          cp -r data _site/data
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+      - id: dagit
+        uses: actions/deploy-pages@v4
