@@ -700,6 +700,10 @@ function referansFiyat(kod) { const r = REFERANS[kod], o = r && D.ons?.[r[0]];
   return o && D.kur ? o / ONS_GRAM * D.kur.fiyat * r[1] : null }
 // otomatik takip tabanı: gümüşte gram gümüş, diğer tüm altın türlerinde gram has altın (oran kullanıcının fiyatından)
 const tabanFiyat = kod => referansFiyat(kod === "Gümüş (gram)" ? "Gümüş (gram)" : "Gram altın");
+// içerdiği has altın (gram): 22 ayar = 0,916; çeyrek 1,754 g, yarım 3,508 g, tam 7,016 g, Cumhuriyet/Ata 7,216 g.
+// Bu türler varsayılan olarak canlı piyasa fiyatıyla (gram has × içerik) değerlenir; işçilik/kuyumcu makası hariçtir.
+const ALTIN_ICERIK = { "Gram altın": 1, "Çeyrek altın": 1.754 * 0.916, "Yarım altın": 3.508 * 0.916, "Tam altın": 7.016 * 0.916,
+  "Cumhuriyet altını": 7.216 * 0.916, "Ata altın": 7.216 * 0.916, "22 ayar bilezik (gram)": 0.916, "Gümüş (gram)": 1 };
 function fiyatKaydet(sinif, kod, fiyat) {   // elle girilen fiyat; otomatik takipte oran da tazelenir
   const f = PF.fiyatlar[sinif + ":" + kod], yeni = { fiyat, tarih: bugunISO() };
   if (f?.oto) { const t = tabanFiyat(kod); if (t) Object.assign(yeni, { oto: true, katsayi: fiyat / t }) }
@@ -709,6 +713,11 @@ const ALTIN_TURLERI = ["Gram altın", "Çeyrek altın", "Yarım altın", "Tam al
 let pfSinif = "hisse", pfTur = "al", kurGecmis = null;
 function pfOku() { try { const v = JSON.parse(localStorage.getItem(PF_ANAHTAR) || "null"); if (v && Array.isArray(v.islemler)) return { fiyatlar: {}, ...v } } catch {} return { v: 1, islemler: [], fiyatlar: {} } }
 let PF = pfOku();
+if ((PF.v || 1) < 2) {   // eski elle girilmiş altın fiyatları canlı piyasa takibine geçer (kullanıcı isteği, 2026-11-03)
+  for (const [k, f] of Object.entries(PF.fiyatlar)) { const tur = k.slice(6);
+    if (k.startsWith("altin:") && ALTIN_ICERIK[tur] && !f.oto) PF.fiyatlar[k] = { ...f, oto: true, katsayi: ALTIN_ICERIK[tur] } }
+  PF.v = 2; try { localStorage.setItem(PF_ANAHTAR, JSON.stringify(PF)) } catch {}
+}
 function pfYaz() { try { localStorage.setItem(PF_ANAHTAR, JSON.stringify(PF)); return true } catch { $("#pf-hata").textContent = "Kayıt yazılamadı (tarayıcı depolaması kapalı olabilir)."; return false } }
 try { navigator.storage?.persist?.() } catch {}
 const sayiOku = t => { t = String(t || "").trim().replace(/\s/g, ""); if (!t) return NaN;
@@ -735,7 +744,8 @@ function guncelFiyat(sinif, kod) {
   if (sinif === "hisse") { const h = D.harita[kod]; if (h && h.close != null) return { fiyat: h.close, kaynak: "canlı" } }
   const f = PF.fiyatlar[sinif + ":" + kod]; if (!f) return { fiyat: null, kaynak: "" };
   const t = sinif === "altin" && f.oto ? tabanFiyat(kod) : null;
-  if (t) return { fiyat: t * f.katsayi, kaynak: "otomatik", fiyatTarihi: bugunISO(), oto: true };
+  if (t) return { fiyat: t * f.katsayi, kaynak: Math.abs(f.katsayi - (ALTIN_ICERIK[kod] ?? NaN)) < 1e-9 ? "canlı piyasa" : "canlı · kendi oranınız",
+    fiyatTarihi: bugunISO(), oto: true };
   return { fiyat: f.fiyat, kaynak: tarihTR(f.tarih), fiyatTarihi: f.tarih, oto: !!f.oto };
 }
 function pozisyonlar(sinif) {
@@ -791,8 +801,8 @@ async function portfoyCiz() {
         ${pfSinif === "fon" ? `<a href="https://www.tefas.gov.tr/tr/fon-detayli-analiz/${encodeURIComponent(p.kod)}" target="_blank" rel="noopener">TEFAS'ta gör</a>` : ""}</div>
         ${pfSinif === "altin" ? `<label class="not" style="display:flex;gap:8px;align-items:flex-start;margin-top:6px">
           <input type="checkbox" class="pf-oto" data-kod="${esc(p.kod)}" ${p.oto ? "checked" : ""} style="margin-top:3px;width:18px;height:18px">
-          <span>Otomatik takip: girdiğim fiyatı internet fiyatına oranlayıp her gün güncelle${p.oto && PF.fiyatlar["altin:" + p.kod]?.katsayi ? ` (oran ${sayi(PF.fiyatlar["altin:" + p.kod].katsayi, 4)} · son elle giriş ${tarihTR(PF.fiyatlar["altin:" + p.kod].tarih)})` : ""}</span></label>` : ""}
-        ${ref ? `<p class="not">İnternet referansı (ons × kur, has altın): <b class="sayi">${sayi(ref, 2)} TL</b> · kuyumcu fiyatı farklıdır.
+          <span>Canlı takip: fiyat piyasadan (ons × dolar kuru) anlık hesaplanır. Kutuya kendi fiyatınızı (ör. kuyumcu) yazarsanız aradaki fark oranı korunarak takip sürer.${p.oto && p.kaynak !== "canlı piyasa" && ALTIN_ICERIK[p.kod] ? ` <button type="button" class="sil pf-piyasa" data-kod="${esc(p.kod)}" style="font-size:13px;padding:0;text-decoration:underline;color:var(--vurgu)">Piyasa fiyatına dön</button>` : ""}</span></label>` : ""}
+        ${ref && !p.oto ? `<p class="not">İnternet referansı (ons × kur, has altın): <b class="sayi">${sayi(ref, 2)} TL</b> · kuyumcu fiyatı farklıdır.
           <button type="button" class="sil pf-ref" data-kod="${esc(p.kod)}" data-fiyat="${ref}" style="font-size:13px;padding:0 0 0 4px;text-decoration:underline;color:var(--vurgu)">Bunu kullan</button></p>` : ""}` : ""}
     </div>`; }).join("") : `<p class="durum">${SINIF[pfSinif].ad} kaydı yok.</p>`;
   // işlem listesi (yeniden eskiye)
@@ -836,7 +846,7 @@ $("#pf-form").addEventListener("submit", e => {
   PF.islemler.push({ id: Date.now(), sinif: pfSinif, kod, tur: pfTur, tarih, adet, fiyat, not: $("#pf-not").value.trim() });
   const onceki = PF.fiyatlar[pfSinif + ":" + kod];   // fon/altında en yeni işlem fiyatı, daha yeni elle girilmiş fiyat yoksa güncel fiyat olur
   if (pfSinif !== "hisse" && (!onceki || onceki.tarih <= tarih)) {
-    if (onceki?.oto && tarih === bugunISO()) fiyatKaydet(pfSinif, kod, fiyat);
+    if (!onceki && pfSinif === "altin" && ALTIN_ICERIK[kod]) PF.fiyatlar[pfSinif + ":" + kod] = { fiyat, tarih, oto: true, katsayi: ALTIN_ICERIK[kod] };
     else if (!onceki?.oto) PF.fiyatlar[pfSinif + ":" + kod] = { fiyat, tarih } }
   if (!pfYaz()) return;
   ["#pf-kod", "#pf-adet", "#pf-fiyat", "#pf-not"].forEach(s => $(s).value = "");
@@ -856,13 +866,17 @@ $("#pf-islemler").addEventListener("click", e => {
 $("#pf-pozisyonlar").addEventListener("click", e => {
   const b = e.target.closest(".pf-ref"); if (!b) return;
   fiyatKaydet(pfSinif, b.dataset.kod, Number(b.dataset.fiyat)); pfYaz(); portfoyCiz() });
+$("#pf-pozisyonlar").addEventListener("click", e => {
+  const b = e.target.closest(".pf-piyasa"); if (!b) return; e.preventDefault();
+  const k = "altin:" + b.dataset.kod; PF.fiyatlar[k] = { ...PF.fiyatlar[k], oto: true, katsayi: ALTIN_ICERIK[b.dataset.kod] }; pfYaz(); portfoyCiz() });
 $("#pf-pozisyonlar").addEventListener("change", e => {
   const oto = e.target.closest(".pf-oto");
   if (oto) {
     const k = "altin:" + oto.dataset.kod, f = PF.fiyatlar[k], t = tabanFiyat(oto.dataset.kod);
     if (oto.checked) {
-      if (!f || !t) { oto.checked = false; alert(!f ? "Önce güncel fiyatı girin." : "İnternet fiyatı şu an alınamıyor; biraz sonra yeniden deneyin."); return }
-      PF.fiyatlar[k] = { ...f, oto: true, katsayi: f.fiyat / t };
+      const icerik = ALTIN_ICERIK[oto.dataset.kod];
+      if (!t || (!f && !icerik)) { oto.checked = false; alert(!t ? "Piyasa fiyatı şu an alınamıyor; biraz sonra yeniden deneyin." : "Bu tür için önce güncel fiyatı girin."); return }
+      PF.fiyatlar[k] = { ...(f || {}), fiyat: f?.fiyat ?? t * icerik, tarih: f?.tarih ?? bugunISO(), oto: true, katsayi: icerik ?? f.fiyat / t };
     } else { const g = guncelFiyat("altin", oto.dataset.kod); PF.fiyatlar[k] = { fiyat: g.fiyat ?? f.fiyat, tarih: bugunISO() } }
     pfYaz(); portfoyCiz(); return;
   }
