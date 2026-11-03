@@ -1,0 +1,30 @@
+name: Sabah bildirimi
+
+on:
+  schedule:
+    # hafta içi TR 10:20 (UTC 07:20); GitHub zamanlanmış işleri yoğunlukta birkaç-on dakika geciktirebilir
+    - cron: "20 7 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      zorla:
+        description: "Tatil kontrolünü atla (deneme)"
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  gonder:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pywebpush
+      - run: python bildirim_gonder.py ${{ (github.event_name == 'workflow_dispatch' && inputs.zorla) && '--zorla' || '' }}
+        env:
+          VAPID_OZEL: ${{ secrets.VAPID_OZEL }}
+          PUSH_ABONELIK: ${{ secrets.PUSH_ABONELIK }}

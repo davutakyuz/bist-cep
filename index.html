@@ -210,6 +210,16 @@ input[type="text"], input[type="date"], input[type="password"] { width: 100%; mi
       </div>
       <div id="a-icerik" style="margin-top:10px"></div>
     </div>
+    <div class="kutu" id="bl-kutu">
+      <h2>Sabah bildirimi</h2>
+      <p class="not" id="bl-durum">Hafta içi borsa açıldıktan sonra (~10:20) BIST 100'ün açılışını ve kaç hissenin artıda/ekside başladığını bildirim olarak gönderir.</p>
+      <div class="dugmeler" style="margin-top:10px"><button type="button" class="dugme" id="bl-ac">Bildirimleri aç</button></div>
+      <div id="bl-kod-alan" hidden style="margin-top:12px">
+        <p class="not">Son adım: aşağıdaki kodu kopyalayıp GitHub'da <b>PUSH_ABONELIK</b> adlı gizli değere yapıştırın (adımlar README'de). Bu kod yalnızca bildirimin bu telefona ulaşması içindir; portföy bilgisi içermez.</p>
+        <textarea id="bl-kod" readonly rows="4" style="width:100%;margin-top:8px;font:12px var(--f-sayi);background:var(--yuzey2);color:var(--yazi);border:1px solid var(--cizgi);border-radius:8px;padding:8px"></textarea>
+        <div class="dugmeler" style="margin-top:8px"><button type="button" class="dugme ikincil" id="bl-kopyala">Kodu kopyala</button></div>
+      </div>
+    </div>
   </section>
 
   <!-- GRAFİK -->
@@ -926,6 +936,39 @@ $("#pf-pin-degistir").addEventListener("click", () => { pinKurulum = true; kilit
 document.addEventListener("visibilitychange", () => { if (document.hidden) kilitle() });
 ["pointerdown", "keydown"].forEach(t => document.addEventListener(t, () => { if (pfAcik) {
   if (Date.now() - pfSonDokunma > KILIT_SURE) kilitle(); else pfSonDokunma = Date.now() } }, true));
+
+// ---------------------------------------------------------------- bildirim (Web Push)
+// iPhone'da yalnızca ana ekrana eklenmiş uygulamada (iOS 16.4+) çalışır. Abonelik kodu GitHub'daki gizli değere
+// yapıştırılır; sabah gönderimini .github/workflows/bildirim.yml yapar.
+const VAPID_ACIK = "BFwYKvz-GTIyJNVb3OJN4qlmKZUzHIqpavCOnj5HbKRwVY9GmSm2HEFHnFnepOk4fJw2Xfu1QSR-2ZJvjH9ChXU";
+const swKayit = "serviceWorker" in navigator ? navigator.serviceWorker.register("sw.js").catch(() => null) : Promise.resolve(null);
+const anaEkranda = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+function b64Bayt(s) { const p = "=".repeat((4 - s.length % 4) % 4), b = atob((s + p).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(b, c => c.charCodeAt(0)) }
+function kodGoster(abone) { $("#bl-kod").value = JSON.stringify(abone); $("#bl-kod-alan").hidden = false }
+async function bildirimDurum() {
+  const destek = "Notification" in window && "PushManager" in window && "serviceWorker" in navigator;
+  if (!destek) { $("#bl-ac").hidden = true;
+    $("#bl-durum").textContent = /iPhone|iPad/.test(navigator.userAgent) && !anaEkranda()
+      ? "Bildirim için BIST Cep'i ana ekrandaki simgesinden açın (iOS 16.4 veya üstü gerekir)." : "Bu tarayıcı bildirimleri desteklemiyor."; return }
+  if (Notification.permission === "denied") { $("#bl-ac").hidden = true; $("#bl-durum").textContent = "Bildirim izni kapalı. iPhone Ayarlar → Bildirimler → BIST Cep'ten açabilirsiniz."; return }
+  const kayit = await swKayit, abone = kayit && await kayit.pushManager.getSubscription();
+  if (abone && Notification.permission === "granted") { $("#bl-ac").textContent = "Kodu yeniden göster"; $("#bl-durum").textContent = "Bildirimler bu telefonda açık."; }
+}
+$("#bl-ac").addEventListener("click", async () => {
+  try {
+    const izin = await Notification.requestPermission();
+    if (izin !== "granted") { $("#bl-durum").textContent = "İzin verilmedi; bildirim gelmeyecek."; return }
+    const kayit = await swKayit || await navigator.serviceWorker.ready;
+    const abone = await kayit.pushManager.getSubscription() || await kayit.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64Bayt(VAPID_ACIK) });
+    kodGoster(abone); $("#bl-durum").textContent = "Bildirimler bu telefonda açık."; $("#bl-ac").textContent = "Kodu yeniden göster";
+  } catch (e) { $("#bl-durum").textContent = "Bildirim açılamadı: " + (e && e.message || e) }
+});
+$("#bl-kopyala").addEventListener("click", async () => {
+  try { await navigator.clipboard.writeText($("#bl-kod").value); $("#bl-kopyala").textContent = "Kopyalandı" }
+  catch { $("#bl-kod").select(); $("#bl-kopyala").textContent = "Seçildi — Kopyala'ya basın" }
+});
+bildirimDurum();
 
 // ---------------------------------------------------------------- görünümler
 // liste görünümlerinde kaydırma konumu hatırlanır; dönünce son seçilen hisse satırı işaretlenir

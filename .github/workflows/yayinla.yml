@@ -51,7 +51,7 @@ jobs:
       - name: Site klasörünü hazırla
         run: |
           mkdir _site
-          cp index.html manifest.webmanifest ikon-*.png _site/
+          cp index.html manifest.webmanifest sw.js ikon-*.png _site/
           cp -r data _site/data
       - uses: actions/upload-pages-artifact@v3
         with:

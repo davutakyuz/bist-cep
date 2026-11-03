@@ -26,6 +26,15 @@ Veriler git geçmişine yazılmaz; geçmiş veri Actions önbelleğinde tutulur.
 6. Bitince adres: `https://KULLANICI-ADINIZ.github.io/bist-cep/`
 7. Telefonda bu adresi açın → tarayıcı menüsü → **Ana ekrana ekle**. Uygulama gibi açılır.
 
+## Sabah bildirimi (iPhone, iOS 16.4+)
+1. BIST Cep'i **ana ekrandaki simgesinden** açın → Açılış sekmesinin en altı → **Bildirimleri aç** → İzin ver.
+2. Çıkan kodu **Kodu kopyala** ile kopyalayın.
+3. github.com/davutakyuz/bist-cep → **Settings → Secrets and variables → Actions → New repository secret**:
+   - Ad `PUSH_ABONELIK`, değer: kopyaladığınız kod.
+   - Ad `VAPID_OZEL`, değer: bilgisayardaki `BIST_CEP_GIZLI_ANAHTAR.txt` dosyasının son satırı (depoda değildir).
+4. **Actions → Sabah bildirimi → Run workflow** ile hemen deneyin; telefona bildirim gelmeli.
+Sonra hafta içi her sabah ~10:20'de (GitHub bazen gecikir) BIST 100 açılış özeti gelir; tatil günlerinde gelmez.
+
 ## Yerelde deneme
 ```bash
 python veri_uret.py --gecmis
