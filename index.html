@@ -398,9 +398,15 @@ async function canliYenile() {
 }
 
 // TL getirisini seçili para birimine çevirir: USD getiri = (1 + TL) / (1 + kur) − 1
+// dönem başı; ilk işlem günü bundan yeni hissede TradingView "halka arzdan beri" getiriyi verir → gösterilmez
+function donemBasi(d) { const t = new Date(), ay = { a: 1, y: 12, y3: 36, y5: 60 }[d];
+  if (d === "h") t.setDate(t.getDate() - 7); else if (d === "ybb") { t.setMonth(0, 1) } else if (ay) t.setMonth(t.getMonth() - ay); else return null;
+  return t.toISOString().slice(0, 10) }
 function getiri(h, d) {
   const [alan, kurAlan] = DONEM[d]; const v = h[alan];
   if (v == null) return null;
+  const ilk = D.ozet?.hisse?.[h.kod]?.ilk, bas = donemBasi(d);
+  if (ilk && bas && ilk > bas) return null;
   return D.para === "TL" || !D.kur ? v / 100 : (1 + v / 100) / (1 + D.kur[kurAlan]) - 1;
 }
 const fiyatPB = h => h && h.close != null ? (D.para === "TL" ? h.close : h.close / (D.kur?.fiyat || NaN)) : null;

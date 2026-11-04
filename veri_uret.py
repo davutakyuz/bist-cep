@@ -154,6 +154,7 @@ def gecmis(kodlar):
                                    "a": seri_json(s.resample("ME").last(), usd.resample("ME").last())})
         son_yil = u.loc[yil_once:]
         ozet["hisse"][k] = {"zu": round(float(u.max()), 5), "zt": u.idxmax().strftime("%Y-%m-%d"),
+                            "ilk": u.index.min().strftime("%Y-%m-%d"),     # ilk işlem günü (halka arz sonrası)
                             "d52u": round(float(son_yil.min()), 5), "z52u": round(float(son_yil.max()), 5)}
     yaz(GECMIS / "ozet.json", ozet)
     log(f"Geçmiş yazıldı: {len(ozet['hisse'])} seri, son kapanış {son:%d.%m.%Y}")
