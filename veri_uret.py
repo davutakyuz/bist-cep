@@ -25,6 +25,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from veri_temizle import temizle
+
 KLASOR = Path(__file__).resolve().parent / "data"
 GECMIS = KLASOR / "gecmis"
 ONBELLEK = Path(__file__).resolve().parent / "onbellek" / "ham.pkl"
@@ -92,6 +94,13 @@ def is_yatirim(kod, bitis, baslangic="01-01-2000"):
         try:
             v = json.loads(getir(url, zaman=90)).get("value") or []
             if not v:
+                # bazı hisselerde 2000'den sorgu boş ama kısa aralık dolu (ör. INTEK, LRSHO, LYDHO); yoksa Yahoo yedeği
+                if baslangic == "01-01-2000":
+                    for b in [f"01-01-{y}" for y in range(2002, dt.date.today().year + 1)]:   # en eski dolu yıl
+                        _, df = is_yatirim(kod, bitis, b)
+                        if df is not None:
+                            return kod, df
+                    return kod, yahoo_gecmis(kod)
                 return kod, None
             df = pd.DataFrame(v)
             out = pd.DataFrame({"tl": df["HGDG_KAPANIS"].astype(float),        # düzeltilmiş kapanış
@@ -104,6 +113,22 @@ def is_yatirim(kod, bitis, baslangic="01-01-2000"):
             time.sleep(2 + 3 * deneme)
     log(f"UYARI: {kod} İş Yatırım'dan alınamadı ({hata})")
     return kod, None
+
+
+def yahoo_gecmis(kod):
+    """İş Yatırım'da hiç olmayan hisseler için Yahoo günlük düzeltilmiş kapanış (ör. CITAS); kur ortak seriden gelir."""
+    try:
+        r = json.loads(getir(f"https://query1.finance.yahoo.com/v8/finance/chart/{kod}.IS?range=20y&interval=1d",
+                             zaman=60))["chart"]["result"][0]
+        ts = r.get("timestamp") or []
+        if not ts:
+            return None
+        duz = (r["indicators"].get("adjclose") or [{}])[0].get("adjclose") or r["indicators"]["quote"][0]["close"]
+        out = pd.DataFrame({"tl": pd.to_numeric(duz), "kur": float("nan"), "xu100": float("nan")},
+                           index=pd.to_datetime(ts, unit="s").normalize()).dropna(subset=["tl"])
+        return out[~out.index.duplicated(keep="last")].sort_index() if len(out) else None
+    except Exception:
+        return None
 
 
 def onbellekli(kod, bitis, onbellek):
@@ -139,6 +164,11 @@ def gecmis(kodlar):
         raise RuntimeError(f"İş Yatırım'dan yalnızca {len(veri)}/{len(kodlar)} hisse geldi; eski geçmiş korunuyor.")
     ONBELLEK.parent.mkdir(exist_ok=True)
     pd.to_pickle({**onbellek, **veri}, ONBELLEK)
+    duzeltme = 0
+    for k in list(veri):                       # bozuk kayıt / düzeltilmemiş sermaye işlemi (önbellek ham kalır)
+        veri[k], notlar = temizle(k, veri[k])
+        duzeltme += len(notlar)
+    log(f"Temizlik: {duzeltme} düzeltme")
     kur = pd.concat([d["kur"] for d in veri.values()]).groupby(level=0).last().sort_index()
     tl = {k: d["tl"].reindex(kur.index) for k, d in veri.items()}
     tl["XU100"] = pd.concat([d["xu100"] for d in veri.values()]).groupby(level=0).last().reindex(kur.index)
