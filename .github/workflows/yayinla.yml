@@ -40,7 +40,8 @@ jobs:
           key: gecmis-${{ github.run_id }}
           restore-keys: gecmis-
       - id: uret
-        run: python veri_uret.py
+        # elle başlatılan / gönderimle tetiklenen çalıştırmada geçmiş her zaman yenilenir (zamanlıda 6 saatte bir)
+        run: python veri_uret.py ${{ github.event_name != 'schedule' && '--gecmis' || '' }}
       - uses: actions/cache/save@v4
         if: steps.uret.outputs.gecmis_yenilendi == 'true'
         with:
