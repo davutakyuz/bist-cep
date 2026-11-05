@@ -3,6 +3,13 @@
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 
+// uygulama sayfasının kendisi önbelleği atlayarak yüklenir (GitHub Pages 10 dk önbellekliyor; düzeltmeler geç geliyordu);
+// ağ yoksa tarayıcının elindeki kopya
+self.addEventListener("fetch", e => {
+  if (e.request.mode !== "navigate") return;
+  e.respondWith(fetch(e.request, { cache: "no-store" }).catch(() => fetch(e.request)));
+});
+
 self.addEventListener("push", e => {
   let v = {};
   try { v = e.data ? e.data.json() : {} } catch { v = { govde: e.data && e.data.text() } }
