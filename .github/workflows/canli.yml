@@ -1,0 +1,37 @@
+name: Gün içi canlı veri
+
+on:
+  schedule:
+    # Hafta içi; birden çok başlangıç saati: GitHub zamanlanmış işleri geciktirip atlayabiliyor.
+    # Biri başlayınca 18:40'a (TR) kadar kendi içinde 5 dk'da bir döner; diğerleri sırada bekleyip
+    # ilk iş bitince devam eder ya da saat geçmişse hemen kapanır.
+    - cron: "50 6 * * 1-5"
+    - cron: "30 7 * * 1-5"
+    - cron: "30 8 * * 1-5"
+    - cron: "30 10 * * 1-5"
+    - cron: "30 12 * * 1-5"
+  workflow_dispatch:
+  push:                      # döngü kodu değişince hemen başlasın
+    branches: [main]
+    paths: [canli_dongu.py, .github/workflows/canli.yml]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: canli
+  cancel-in-progress: false
+
+jobs:
+  dongu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pandas
+      - run: python canli_dongu.py
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

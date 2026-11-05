@@ -422,7 +422,7 @@ function seritCiz() {
   if (xu) { $("#xu").textContent = sayi(fiyatPB(xu), D.para === "USD" ? 2 : 0); const g = getiri(xu, "g");
     $("#xu-d").textContent = yuzde(g); $("#xu-d").className = "sayi " + (g >= 0 ? "" : "") }
   if (D.kur) { $("#kur").textContent = sayi(D.kur.fiyat, 4); $("#kur-d").textContent = yuzde(D.kur.KurG) }
-  $("#yenileme").textContent = D.sonYenileme ? "Son yenileme " + D.sonYenileme.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) + " · BIST ~15 dk gecikmeli" : "";
+  $("#yenileme").textContent = D.sonYenileme ? "Son yenileme " + D.sonYenileme.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" }) + " · 30 sn'de bir · BIST verisi ~15 dk gecikmeli" : "";
 }
 
 // ---------------------------------------------------------------- liste
@@ -543,6 +543,15 @@ function okumaYaz(n, son) {
   $("#o-deg").className = "sayi metin-" + (deg >= 0 ? "art" : "dus");
 }
 let grafikSira = 0;   // geç gelen eski bir yükleme yeni seçimin üzerine çizmesin
+// gün içi: GitHub'daki döngü 'canli' dalına 5 dk'da bir yazar (raw: CORS açık, ~5 dk önbellek); yayındaki kopya
+// zamanlanmış işe bağlı ve saatlerce eski kalabiliyor → ikisinden yeni olan
+const CANLI_GUNICI = "https://raw.githubusercontent.com/davutakyuz/bist-cep/canli/gunici.json";
+async function gunIciYukle() {
+  const [a, b] = await Promise.allSettled([json(CANLI_GUNICI + "?t=" + Math.floor(Date.now() / 60000)), json("data/gunici.json")]);
+  const s = [a, b].filter(x => x.status === "fulfilled").map(x => x.value).sort((x, y) => String(y.guncel).localeCompare(String(x.guncel)));
+  if (!s.length) throw new Error("gün içi veri yok");
+  return s[0];
+}
 async function grafikCiz(veriYukle = true) {
   const benim = ++grafikSira;
   if (!grafik) grafikKur();
@@ -555,7 +564,7 @@ async function grafikCiz(veriYukle = true) {
   let noktalar = [];
   try {
     if (gunIci()) {
-      if (veriYukle || !D.gunici) D.gunici = await json("data/gunici.json");
+      if (veriYukle || !D.gunici) D.gunici = await gunIciYukle();
       const ham = D.gunici[D.donem === "1g" ? "g" : "h"], s = ham[kod] || [], kur = ham.USDTRY || [];
       let j = 0;
       noktalar = s.map(([t, f]) => { while (j + 1 < kur.length && kur[j + 1][0] <= t) j++;
@@ -748,10 +757,11 @@ function kurTarihte(tarih) {   // o günün (yoksa önceki işlem gününün) US
 }
 function guncelFiyat(sinif, kod) {
   if (sinif === "hisse") { const h = D.harita[kod]; if (h && h.close != null) return { fiyat: h.close, kaynak: "canlı" } }
+  if (sinif === "altin" && ALTIN_ICERIK[kod] && tabanFiyat(kod)) return { fiyat: tabanFiyat(kod) * ALTIN_ICERIK[kod], kaynak: "canlı piyasa", fiyatTarihi: bugunISO(), oto: true };
   const f = PF.fiyatlar[sinif + ":" + kod]; if (!f) return { fiyat: null, kaynak: "" };
-  const t = sinif === "altin" && f.oto ? tabanFiyat(kod) : null;
-  if (t) return { fiyat: t * f.katsayi, kaynak: Math.abs(f.katsayi - (ALTIN_ICERIK[kod] ?? NaN)) < 1e-9 ? "canlı piyasa" : "canlı · kendi oranınız",
-    fiyatTarihi: bugunISO(), oto: true };
+  // altın: her zaman canlı piyasa fiyatı (gram has × içerik); ons/kur henüz gelmediyse son bilinen fiyat
+  const t = sinif === "altin" && ALTIN_ICERIK[kod] ? tabanFiyat(kod) : null;
+  if (t) return { fiyat: t * ALTIN_ICERIK[kod], kaynak: "canlı piyasa", fiyatTarihi: bugunISO(), oto: true };
   return { fiyat: f.fiyat, kaynak: tarihTR(f.tarih), fiyatTarihi: f.tarih, oto: !!f.oto };
 }
 function pozisyonlar(sinif) {
@@ -796,20 +806,18 @@ async function portfoyCiz() {
   // seçili sınıfın pozisyonları
   const ps = pozisyonlar(pfSinif).filter(p => p.adet > 0 || p.gerceklesen);
   $("#pf-pozisyonlar").innerHTML = ps.length ? ps.map(p => {
-    const ort = p.adet ? p.maliyet / p.adet : null, elle = pfSinif !== "hisse" || p.kaynak !== "canlı";
+    const ort = p.adet ? p.maliyet / p.adet : null;
+    const elle = pfSinif === "fon" || (pfSinif === "hisse" && p.kaynak !== "canlı") || (pfSinif === "altin" && !ALTIN_ICERIK[p.kod]);
     const eski = elle && p.adet > 0 && !p.oto && p.fiyatTarihi && p.fiyatTarihi < bugunISO(), ref = pfSinif === "altin" ? referansFiyat(p.kod) : null;
-    return `<div class="pozisyon"><div class="poz-ust"><b>${esc(p.kod)}</b><span class="sayi">${p.adet === 0 ? "kapandı" : p.deger != null ? sayi(p.deger, 0) + " TL" : "güncel fiyatı girin"}</span></div>
+    return `<div class="pozisyon"><div class="poz-ust"><b>${esc(p.kod)}</b><span class="sayi">${p.adet === 0 ? "kapandı" : p.deger != null ? sayi(p.deger, 0) + " TL" : pfSinif === "altin" ? "fiyat yükleniyor" : "güncel fiyatı girin"}</span></div>
       <div class="poz-satir sayi"><div><span>Miktar</span>${miktar(p.adet)}</div><div><span>Ort. maliyet</span>${sayi(ort, 4)}</div>
         <div><span>Güncel${p.kaynak ? " · " + esc(p.kaynak) : ""}</span>${sayi(p.fiyat, 4)}</div></div>
       <div><span class="not">Kâr/zarar:</span> ${kzYaz(p.kz, p.maliyet)} · USD bazında ${kzYaz(p.kzUsd, p.maliyetUsd, "USD")}${p.gerceklesen ? ` · gerçekleşen ${kzYaz(p.gerceklesen, 0)}` : ""}</div>
       ${elle && p.adet > 0 && !p.oto && (eski || p.fiyat === ort) ? `<p class="not" style="color:var(--imlec)">Güncel fiyat ${eski ? p.kaynak + " tarihli" : "henüz alış fiyatınıza eşit"}; kâr/zarar ancak aşağıya bugünkü fiyatı yazınca değişir.</p>` : ""}
       ${elle && p.adet > 0 ? `<div class="fiyat-gir"><label for="gf-${esc(p.kod)}">Güncel fiyat (TL)</label><input type="text" inputmode="decimal" id="gf-${esc(p.kod)}" data-kod="${esc(p.kod)}" class="pf-guncel" value="${p.fiyat != null ? sayi(p.fiyat, 4) : ""}" placeholder="ör. 3,45">
         ${pfSinif === "fon" ? `<a href="https://www.tefas.gov.tr/tr/fon-detayli-analiz/${encodeURIComponent(p.kod)}" target="_blank" rel="noopener">TEFAS'ta gör</a>` : ""}</div>
-        ${pfSinif === "altin" ? `<label class="not" style="display:flex;gap:8px;align-items:flex-start;margin-top:6px">
-          <input type="checkbox" class="pf-oto" data-kod="${esc(p.kod)}" ${p.oto ? "checked" : ""} style="margin-top:3px;width:18px;height:18px">
-          <span>Canlı takip: fiyat piyasadan (ons × dolar kuru) anlık hesaplanır. Kutuya kendi fiyatınızı (ör. kuyumcu) yazarsanız aradaki fark oranı korunarak takip sürer.${p.oto && p.kaynak !== "canlı piyasa" && ALTIN_ICERIK[p.kod] ? ` <button type="button" class="sil pf-piyasa" data-kod="${esc(p.kod)}" style="font-size:13px;padding:0;text-decoration:underline;color:var(--vurgu)">Piyasa fiyatına dön</button>` : ""}</span></label>` : ""}
-        ${ref && !p.oto ? `<p class="not">İnternet referansı (ons × kur, has altın): <b class="sayi">${sayi(ref, 2)} TL</b> · kuyumcu fiyatı farklıdır.
-          <button type="button" class="sil pf-ref" data-kod="${esc(p.kod)}" data-fiyat="${ref}" style="font-size:13px;padding:0 0 0 4px;text-decoration:underline;color:var(--vurgu)">Bunu kullan</button></p>` : ""}` : ""}
+` : ""}
+      ${pfSinif === "altin" && ALTIN_ICERIK[p.kod] && p.adet > 0 ? `<p class="not">Fiyat canlı: ons altın × dolar kuru, ${sayi(ALTIN_ICERIK[p.kod], 3)} g has altın içeriğiyle (işçilik ve kuyumcu makası hariç).</p>` : ""}
     </div>`; }).join("") : `<p class="durum">${SINIF[pfSinif].ad} kaydı yok.</p>`;
   // işlem listesi (yeniden eskiye)
   const isl = PF.islemler.filter(i => i.sinif === pfSinif).sort((a, b) => b.tarih.localeCompare(a.tarih) || b.id - a.id);
@@ -845,6 +853,7 @@ $("#pf-form").addEventListener("submit", e => {
   const kod = kodDuzelt($("#pf-kod").value), tarih = $("#pf-tarih").value, adet = sayiOku($("#pf-adet").value), fiyat = sayiOku($("#pf-fiyat").value);
   let hata = !kod ? "Kod veya tür girin." : !tarih ? "Tarih seçin." : tarih > bugunISO() ? "Tarih bugünden ileri olamaz."
     : !(adet > 0) ? "Miktar sıfırdan büyük bir sayı olmalı." : !(fiyat > 0) ? "Fiyat sıfırdan büyük bir sayı olmalı."
+    : pfSinif === "altin" && !ALTIN_ICERIK[kod] ? "Listeden bir altın türü seçin (Gram, Çeyrek, Yarım, Tam, Cumhuriyet, Ata, bilezik, gümüş)."
     : pfSinif === "hisse" && D.hisseler.length && !D.harita[kod] && !PF.islemler.some(i => i.kod === kod) ? `${kod} Borsa İstanbul listesinde bulunamadı.` : "";
   if (!hata && pfTur === "sat") { const p = pozisyonlar(pfSinif).find(p => p.kod === kod);
     if (!p || p.adet + 1e-9 < adet) hata = `Elinizde ${p ? miktar(p.adet) : 0} ${kod} var; daha fazlası satılamaz.` }
@@ -1034,9 +1043,14 @@ $("#p-tl").setAttribute("aria-pressed", D.para === "TL"); $("#p-usd").setAttribu
 Promise.allSettled([json("data/gecmis/ozet.json"), json("data/gecmis/tufe.json")]).then(([o, t]) => {
   if (o.status === "fulfilled") D.ozet = o.value; if (t.status === "fulfilled") D.tufe = t.value; listeCiz() });
 canliYenile();
-setInterval(() => { if (!document.hidden) canliYenile() }, 60000);
-setInterval(() => { if (!document.hidden && gunIci() && !$("#v-grafik").hidden) grafikCiz(true) }, 300000);
-document.addEventListener("visibilitychange", () => { if (!document.hidden && D.sonYenileme && Date.now() - D.sonYenileme > 55000) canliYenile() });
+// fiyatlar 30 sn'de bir; gün içi grafik açıkken 2 dk'da bir; uygulamaya dönülünce (iPhone'da arka plandan) hemen
+setInterval(() => { if (!document.hidden) canliYenile() }, 30000);
+setInterval(() => { if (!document.hidden && gunIci() && !$("#v-grafik").hidden) grafikCiz(true) }, 120000);
+function donuste() { if (document.hidden) return;
+  if (!D.sonYenileme || Date.now() - D.sonYenileme > 20000) canliYenile();
+  if (gunIci() && !$("#v-grafik").hidden) grafikCiz(true) }
+document.addEventListener("visibilitychange", donuste);
+addEventListener("pageshow", donuste); addEventListener("focus", donuste);
 </script>
 </body>
 </html>
