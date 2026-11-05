@@ -433,7 +433,7 @@ function filtreDoldur() {
   sek.innerHTML = ["Tümü", ...sektorler].map(s => `<option${s === secS ? " selected" : ""}>${esc(s)}</option>`).join("");
   const altlar = [...new Set(D.hisseler.filter(h => !h.xu && (sek.value === "Tümü" || h.sektorTr === sek.value)).map(h => h.alt))].sort((a, b) => a.localeCompare(b, "tr"));
   alt.innerHTML = ["Tümü", ...altlar].map(s => `<option${s === secA ? " selected" : ""}>${esc(s)}</option>`).join("");
-  if (kayitli.donemL && !filtreDoldur.ilk) { $("#f-donem").value = kayitli.donemL; $("#f-sira").value = kayitli.sira || "azalan" }
+  if (kayitli.sira && !filtreDoldur.ilk) $("#f-sira").value = kayitli.sira;   // dönem bilerek hatırlanmaz: hep Günlük başlar
   filtreDoldur.ilk = true;
 }
 function listeCiz() {
@@ -453,7 +453,8 @@ function listeCiz() {
       <div class="fiyat sayi">${sayi(fiyatPB(h), ondalik())}</div><div class="rozet sayi ${sinif(x)}">${yuzde(x)}</div></li>` };
   $("#liste").innerHTML = [...ust, ...l].map(satir).join("") || `<li class="durum">Bu filtreye uyan hisse yok.</li>`;
   const art = l.filter(h => (deger(h) || 0) > 0).length, dus = l.filter(h => (deger(h) || 0) < 0).length;
-  $("#l-sayi").innerHTML = `<b>${l.length}</b> hisse · <span class="metin-art">${art} ↑</span> · <span class="metin-dus">${dus} ↓</span>`;
+  const etiket = d === "z" ? "zirveden uzaklık" : d === "g" ? "günlük değişim" : d === "ybb" ? "yılbaşından beri değişim" : DONEM[d][3] + "lık değişim";
+  $("#l-sayi").innerHTML = `Yüzdeler: <b>${etiket}</b> · ${l.length} hisse · <span class="metin-art">${art} ↑</span> · <span class="metin-dus">${dus} ↓</span>`;
   const t = d !== "z" && D.tufe ? D.tufe[DONEM[d][2]] : null;
   $("#l-tufe").innerHTML = t != null ? `Aynı dönem TÜFE: <b>${yuzde(t)}</b>` : "";
 }
