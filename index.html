@@ -729,6 +729,30 @@ const ALTIN_TURLERI = ["Gram altın", "Çeyrek altın", "Yarım altın", "Tam al
 let pfSinif = "hisse", pfTur = "al", kurGecmis = null;
 function pfOku() { try { const v = JSON.parse(localStorage.getItem(PF_ANAHTAR) || "null"); if (v && Array.isArray(v.islemler)) return { fiyatlar: {}, ...v } } catch {} return { v: 1, islemler: [], fiyatlar: {} } }
 let PF = pfOku();
+// altın türü adı nasıl yazılmış olursa olsun (büyük/küçük harf, "gram", "çeyrek", "has" ...) listedeki türe eşlenir;
+// eşlenmeyen kayıt canlı fiyat alamıyor, eski elle girilmiş fiyatta kalıyordu (ör. "gram altın" → kâr hiç değişmiyordu)
+function altinTuru(k) {
+  const t = String(k || "").toLocaleLowerCase("tr").replace(/\s+/g, " ").trim()
+    .replace(/ç/g, "c").replace(/ı/g, "i").replace(/ş/g, "s").replace(/ü/g, "u").replace(/ö/g, "o").replace(/ğ/g, "g");
+  if (!t) return null;
+  if (t.includes("gumus")) return "Gümüş (gram)";
+  if (t.includes("bilezik") || t.includes("22 ayar")) return "22 ayar bilezik (gram)";
+  if (t.includes("ceyrek")) return "Çeyrek altın";
+  if (t.includes("yarim")) return "Yarım altın";
+  if (t.includes("cumhuriyet")) return "Cumhuriyet altını";
+  if (/\bata\b/.test(t)) return "Ata altın";
+  if (/\btam\b/.test(t)) return "Tam altın";
+  if (t.includes("gram") || t.includes("has") || t.includes("24 ayar") || t === "altin") return "Gram altın";
+  return null;
+}
+function altinAdlariniDuzelt() {   // kayıtları ve fiyat anahtarlarını listedeki adlara çevirir; her açılışta ve yedekten yüklemede
+  let degisti = false;
+  for (const i of PF.islemler) if (i.sinif === "altin") { const t = altinTuru(i.kod); if (t && t !== i.kod) { i.kod = t; degisti = true } }
+  for (const k of Object.keys(PF.fiyatlar)) if (k.startsWith("altin:")) { const t = altinTuru(k.slice(6));
+    if (t && "altin:" + t !== k) { PF.fiyatlar["altin:" + t] ||= PF.fiyatlar[k]; delete PF.fiyatlar[k]; degisti = true } }
+  if (degisti) try { localStorage.setItem(PF_ANAHTAR, JSON.stringify(PF)) } catch {}
+}
+altinAdlariniDuzelt();
 if ((PF.v || 1) < 2) {   // eski elle girilmiş altın fiyatları canlı piyasa takibine geçer (kullanıcı isteği, 2026-11-03)
   for (const [k, f] of Object.entries(PF.fiyatlar)) { const tur = k.slice(6);
     if (k.startsWith("altin:") && ALTIN_ICERIK[tur] && !f.oto) PF.fiyatlar[k] = { ...f, oto: true, katsayi: ALTIN_ICERIK[tur] } }
@@ -837,7 +861,7 @@ function formHazirla() {
   if (dl.dataset.sinif !== pfSinif || dl.options.length !== kodlar.length) { dl.innerHTML = kodlar.map(k => `<option value="${esc(k)}">`).join(""); dl.dataset.sinif = pfSinif }
   if (!$("#pf-tarih").value) $("#pf-tarih").value = bugunISO();
 }
-const kodDuzelt = k => { k = k.trim(); return pfSinif === "altin" ? k : k.toLocaleUpperCase("tr") };
+const kodDuzelt = k => { k = k.trim(); return pfSinif === "altin" ? altinTuru(k) || k : k.toLocaleUpperCase("tr") };
 $("#pf-kod").addEventListener("change", () => {   // kod seçilince fiyat önerisi: hissede bugünkü canlı fiyat, diğerlerinde son girilen
   const k = kodDuzelt($("#pf-kod").value); $("#pf-kod").value = k;
   if ($("#pf-fiyat").value) return;
@@ -913,7 +937,7 @@ $("#pf-yukle").addEventListener("change", async e => {
   try {
     const v = JSON.parse(await f.text()); if (!v || !Array.isArray(v.islemler)) throw new Error();
     if (!confirm(`Yedekteki ${v.islemler.length} işlem yüklenecek ve bu telefondaki ${PF.islemler.length} işlemin yerini alacak. Devam edilsin mi?`)) return;
-    PF = { v: 1, islemler: v.islemler, fiyatlar: v.fiyatlar || {} }; pfYaz(); $("#pf-yedek-durum").textContent = "Yedek yüklendi."; portfoyCiz();
+    PF = { v: 2, islemler: v.islemler, fiyatlar: v.fiyatlar || {} }; altinAdlariniDuzelt(); pfYaz(); $("#pf-yedek-durum").textContent = "Yedek yüklendi."; portfoyCiz();
   } catch { $("#pf-yedek-durum").textContent = "Bu dosya bir BIST Cep yedeği değil." }
 });
 
