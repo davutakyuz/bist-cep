@@ -124,8 +124,8 @@ a { color: var(--vurgu) }
 /* alt sekme çubuğu */
 nav.sekmeler { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; transform: translateZ(0); -webkit-transform: translateZ(0); background: var(--yuzey); border-top: 1px solid var(--cizgi);
   padding-bottom: env(safe-area-inset-bottom, 0px); padding-left: max(8px, env(safe-area-inset-left, 0px)); padding-right: max(8px, env(safe-area-inset-right, 0px)) }
-nav.sekmeler div { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: repeat(5, 1fr) }
-nav.sekmeler button { border: 0; background: none; padding: 9px 0 10px; display: grid; justify-items: center; gap: 3px; font-size: 12px; font-weight: 600; color: var(--soluk); cursor: pointer }
+nav.sekmeler div { max-width: 720px; margin: 0 auto; display: grid; grid-template-columns: repeat(6, 1fr) }
+nav.sekmeler button { border: 0; background: none; padding: 9px 0 10px; display: grid; justify-items: center; gap: 3px; font-size: 11px; font-weight: 600; color: var(--soluk); cursor: pointer }
 nav.sekmeler svg { width: 22px; height: 22px; stroke: currentColor; fill: none; stroke-width: 1.8 }
 nav.sekmeler button[aria-current="page"] { color: var(--vurgu) }
 @media (prefers-reduced-motion: no-preference) { .liste li { transition: background .15s } }
@@ -172,7 +172,30 @@ input[type="text"], input[type="date"], input[type="password"] { width: 100%; mi
 
 <main>
   <!-- LİSTE -->
-  <section class="gorunum" id="v-liste">
+  <!-- FAVORİLER (açılış ekranı) -->
+  <section class="gorunum" id="v-favori">
+    <div class="kutu">
+      <div class="baslik-hisse" style="align-items:center"><h2 style="margin:0">Favorilerim</h2>
+        <button type="button" class="dugme ikincil" id="fv-duzenle" style="padding:6px 12px;font-size:13px">Düzenle</button></div>
+      <ul class="liste" id="fv-liste" style="margin-top:6px"><li class="durum">Fiyatlar yükleniyor…</li></ul>
+      <p class="not" id="fv-not" style="margin-top:8px"></p>
+    </div>
+    <div class="kutu" id="fv-duzen" hidden>
+      <h2>Favori ekle</h2>
+      <div class="filtre">
+        <div class="segment tam" role="group" aria-label="Tür" id="fv-tur">
+          <button type="button" data-t="hisse" aria-pressed="true">Hisse</button><button type="button" data-t="fon" aria-pressed="false">Fon</button><button type="button" data-t="altin" aria-pressed="false">Altın</button>
+        </div>
+        <div class="alan tam"><label for="fv-ekle">Kod ya da tür</label><input type="text" id="fv-ekle" list="fv-oneriler" autocomplete="off" autocapitalize="characters"><datalist id="fv-oneriler"></datalist></div>
+        <p class="hata tam" id="fv-hata" role="alert"></p>
+        <button type="button" class="dugme tam" id="fv-ekle-dugme">Ekle</button>
+      </div>
+      <p class="not" style="margin-top:10px">Çıkarmak için listedeki ×, sırayı değiştirmek için ↑. Fonların canlı fiyatı yok; Portföy'de girdiğiniz son fiyat gösterilir.</p>
+    </div>
+  </section>
+
+  <!-- LİSTE -->
+  <section class="gorunum" id="v-liste" hidden>
     <div class="kutu">
       <div class="filtre">
         <div class="alan tam"><label for="ara">Hisse ara</label><input type="search" id="ara" placeholder="Kod veya şirket adı" autocomplete="off"></div>
@@ -314,7 +337,8 @@ input[type="text"], input[type="date"], input[type="password"] { width: 100%; mi
 </main>
 
 <nav class="sekmeler" aria-label="Bölümler"><div>
-  <button type="button" data-v="liste" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Liste</button>
+  <button type="button" data-v="favori" aria-current="page"><svg viewBox="0 0 24 24"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9z"/></svg>Favori</button>
+  <button type="button" data-v="liste"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>Liste</button>
   <button type="button" data-v="acilis"><svg viewBox="0 0 24 24"><path d="M4 18 9 12l4 3 7-9"/><path d="M15 6h5v5"/></svg>Açılış</button>
   <button type="button" data-v="grafik"><svg viewBox="0 0 24 24"><path d="M3 20h18"/><path d="M5 16l4-6 4 3 6-8"/></svg>Grafik</button>
   <button type="button" data-v="bilanco"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>Bilanço</button>
@@ -380,15 +404,16 @@ async function canliYenile() {
         filter: [{ left: "type", operation: "equal", right: "stock" }, { left: "exchange", operation: "equal", right: "BIST" }] }),
       tara("forex", { columns: ["close", "change", "Perf.W", "Perf.1M", "Perf.YTD", "Perf.Y", "Perf.3Y", "Perf.5Y"], symbols: { tickers: ["FX_IDC:USDTRY"] } })]);
     const k = kur[0].d;
-    tara("cfd", { columns: ["close"], symbols: { tickers: ["OANDA:XAUUSD", "TVC:SILVER"] } })
-      .then(r => { D.ons = Object.fromEntries(r.map(x => [x.s, x.d[0]])); if (!$("#v-portfoy").hidden && pfAcik) portfoyCiz() }).catch(() => {});
+    tara("cfd", { columns: ["close", "change"], symbols: { tickers: ["OANDA:XAUUSD", "TVC:SILVER"] } })
+      .then(r => { D.ons = Object.fromEntries(r.map(x => [x.s, x.d[0]])); D.onsDeg = Object.fromEntries(r.map(x => [x.s, x.d[1]]));
+        if (!$("#v-favori").hidden) favoriCiz(); if (!$("#v-portfoy").hidden && pfAcik) portfoyCiz() }).catch(() => {});
     D.kur = { fiyat: k[0], KurG: k[1] / 100, KurW: k[2] / 100, Kur1M: k[3] / 100, KurYTD: k[4] / 100, KurY: k[5] / 100, Kur3Y: k[6] / 100, Kur5Y: k[7] / 100 };
     D.hisseler = [...xu, ...hisse].map(x => { const o = {}; KOLON.forEach((c, i) => o[c] = x.d[i]);
       o.kod = o.name; o.xu = o.kod === "XU100"; o.sektorTr = o.xu ? "Endeks" : (SEKTOR[o.sector] || o.sector || "Diğer");
       o.alt = o.xu ? "Endeks" : (o["industry.tr"] || "Diğer"); return o; });
     D.harita = Object.fromEntries(D.hisseler.map(h => [h.kod, h]));
     D.sonYenileme = new Date();
-    seritCiz(); filtreDoldur(); listeCiz(); acilisCiz(); seciciDoldur();
+    seritCiz(); filtreDoldur(); listeCiz(); acilisCiz(); seciciDoldur(); if (!$("#v-favori").hidden) favoriCiz();
     if (!$("#v-grafik").hidden) grafikCiz(false);
     if (!$("#v-portfoy").hidden && pfAcik) portfoyCiz();
   } catch (e) {
@@ -1024,13 +1049,91 @@ $("#bl-kopyala").addEventListener("click", async () => {
 });
 bildirimDurum();
 
+// ---------------------------------------------------------------- favoriler
+// Açılışta ilk ekran. Öğeler "hisse:KOD", "altin:Tür", "fon:KOD"; telefonda saklanır. Hisse ve altın canlı
+// (30 sn), fonun canlı kaynağı yok (TEFAS dışarıya kapalı): Portföy'de girilmiş son fiyat ve TEFAS bağlantısı.
+const FV_ANAHTAR = "bistcep-favori";
+const FV_VARSAYILAN = ["hisse:ENDAE", "hisse:ASTOR", "hisse:HRKET", "hisse:TUPRS", "hisse:PGSUS", "hisse:KCHOL", "altin:Gram altın"];
+let FV = (() => { try { const v = JSON.parse(localStorage.getItem(FV_ANAHTAR) || "null"); if (Array.isArray(v)) return v } catch {} return [...FV_VARSAYILAN] })();
+let fvDuzen = false, fvTur = "hisse";
+const fvYaz = () => { try { localStorage.setItem(FV_ANAHTAR, JSON.stringify(FV)) } catch {} };
+
+function altinGunluk(tur) {   // TL: (1 + ons değişimi) × (1 + kur değişimi) − 1; USD: ons değişimi
+  const sembol = tur === "Gümüş (gram)" ? "TVC:SILVER" : "OANDA:XAUUSD", o = D.onsDeg?.[sembol];
+  if (o == null) return null;
+  return D.para === "USD" || !D.kur ? o / 100 : (1 + o / 100) * (1 + D.kur.KurG) - 1;
+}
+function favoriCiz() {
+  const satirlar = FV.map((oge, i) => {
+    const [tur, kod] = [oge.slice(0, oge.indexOf(":")), oge.slice(oge.indexOf(":") + 1)];
+    let ad = "", fiyat = null, deg = null, alt = "", veri = "";
+    if (tur === "hisse") {
+      const h = D.harita[kod];
+      ad = kod; alt = h ? (h.description || "") : "listede bulunamadı";
+      if (h) { fiyat = fiyatPB(h); deg = getiri(h, "g");
+        if (h.gap != null) alt = `açılış ${yuzde(h.gap / 100)} · ${h.alt}` }
+      veri = ` data-kod="${esc(kod)}"`;
+    } else if (tur === "altin") {
+      const t = tabanFiyat(kod);
+      ad = kod; alt = "canlı piyasa (ons × kur), işçilik hariç";
+      if (t && ALTIN_ICERIK[kod]) { fiyat = t * ALTIN_ICERIK[kod] / (D.para === "USD" ? D.kur.fiyat : 1); deg = altinGunluk(kod) }
+    } else {
+      const f = PF.fiyatlar["fon:" + kod];
+      ad = kod; fiyat = f ? f.fiyat / (D.para === "USD" && D.kur ? D.kur.fiyat : 1) : null;
+      alt = (f ? `Portföy'de girilen fiyat · ${tarihTR(f.tarih)} · ` : "fon · canlı fiyat yok · ")
+        + `<a href="https://www.tefas.gov.tr/tr/fon-detayli-analiz/${encodeURIComponent(kod)}" target="_blank" rel="noopener">TEFAS'ta gör</a>`;
+    }
+    const duzen = fvDuzen ? `<span class="dugmeler" style="gap:2px">
+        ${i ? `<button type="button" class="sil fv-yukari" data-i="${i}" aria-label="${esc(ad)} yukarı">↑</button>` : ""}
+        <button type="button" class="sil fv-sil" data-i="${i}" aria-label="${esc(ad)} çıkar">×</button></span>` : "";
+    return `<li${veri}${tur === "hisse" && kod === D.secili ? ' class="son-secilen"' : ""}><div style="min-width:0"><div class="kod">${esc(ad)}</div>
+      <div class="ad">${alt}</div></div>
+      <div class="fiyat sayi">${fiyat == null ? "—" : sayi(fiyat, tur === "altin" || D.para === "USD" ? 2 : ondalik())}</div>
+      ${fvDuzen ? duzen : `<div class="rozet sayi ${sinif(deg)}">${deg == null ? "—" : yuzde(deg)}</div>`}</li>`;
+  });
+  $("#fv-liste").innerHTML = satirlar.join("") || `<li class="durum">Favori yok. "Düzenle" ile ekleyin.</li>`;
+  $("#fv-not").textContent = "Yüzdeler günlük değişim. Hisseye dokununca grafiği açılır. Hisse fiyatları ~15 dk gecikmeli; altın ve kur anlık.";
+}
+function fvOneriler() {
+  const k = fvTur === "hisse" ? D.hisseler.filter(h => !h.xu).map(h => h.kod) : fvTur === "altin" ? ALTIN_TURLERI
+    : [...new Set(PF.islemler.filter(i => i.sinif === "fon").map(i => i.kod))];
+  $("#fv-oneriler").innerHTML = k.map(x => `<option value="${esc(x)}">`).join("");
+  $("#fv-ekle").placeholder = { hisse: "ör. THYAO", fon: "ör. AFT", altin: "ör. Çeyrek altın" }[fvTur];
+}
+$("#fv-duzenle").addEventListener("click", () => {
+  fvDuzen = !fvDuzen; $("#fv-duzen").hidden = !fvDuzen; $("#fv-duzenle").textContent = fvDuzen ? "Bitti" : "Düzenle";
+  if (fvDuzen) fvOneriler(); favoriCiz();
+});
+document.querySelectorAll("#fv-tur button").forEach(b => b.addEventListener("click", () => {
+  fvTur = b.dataset.t; document.querySelectorAll("#fv-tur button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  $("#fv-ekle").value = ""; $("#fv-hata").textContent = ""; fvOneriler() }));
+$("#fv-ekle-dugme").addEventListener("click", () => {
+  const ham = $("#fv-ekle").value.trim();
+  let oge = null, hata = "";
+  if (!ham) hata = "Bir kod ya da tür yazın.";
+  else if (fvTur === "hisse") { const k = ham.toLocaleUpperCase("tr"); if (D.harita[k] && !D.harita[k].xu) oge = "hisse:" + k; else hata = `${k} Borsa İstanbul listesinde yok.` }
+  else if (fvTur === "altin") { const t = altinTuru(ham); if (t) oge = "altin:" + t; else hata = "Listeden bir altın türü seçin." }
+  else { const k = ham.toLocaleUpperCase("tr"); if (/^[A-Z0-9]{3}$/.test(k)) oge = "fon:" + k; else hata = "Fon kodu 3 karakter olmalı (ör. AFT)." }
+  if (oge && FV.includes(oge)) { hata = "Zaten favorilerde."; oge = null }
+  $("#fv-hata").textContent = hata; if (!oge) return;
+  FV.push(oge); fvYaz(); $("#fv-ekle").value = ""; favoriCiz();
+});
+$("#fv-liste").addEventListener("click", e => {   // düzen düğmeleri satırın grafiğe gitmesini tetiklemesin
+  const s = e.target.closest(".fv-sil, .fv-yukari"); if (!s) return;
+  e.stopPropagation();
+  const i = +s.dataset.i;
+  if (s.classList.contains("fv-sil")) FV.splice(i, 1); else [FV[i - 1], FV[i]] = [FV[i], FV[i - 1]];
+  fvYaz(); favoriCiz();
+});
+
 // ---------------------------------------------------------------- görünümler
 // liste görünümlerinde kaydırma konumu hatırlanır; dönünce son seçilen hisse satırı işaretlenir
-const kaydirma = {}, KONUMLU = ["liste", "acilis", "portfoy"];
+const kaydirma = {}, KONUMLU = ["favori", "liste", "acilis", "portfoy"];
 function goster(v) {
-  const onceki = ["liste", "acilis", "grafik", "bilanco", "portfoy"].find(ad => !$("#v-" + ad).hidden);
+  const onceki = ["favori", "liste", "acilis", "grafik", "bilanco", "portfoy"].find(ad => !$("#v-" + ad).hidden);
   if (onceki) kaydirma[onceki] = window.scrollY;
-  for (const ad of ["liste", "acilis", "grafik", "bilanco", "portfoy"]) $("#v-" + ad).hidden = ad !== v;
+  for (const ad of ["favori", "liste", "acilis", "grafik", "bilanco", "portfoy"]) $("#v-" + ad).hidden = ad !== v;
+  if (v === "favori") favoriCiz();
   document.querySelectorAll("nav.sekmeler button").forEach(b => b.dataset.v === v ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
   if (v === "grafik") grafikCiz(true);
   if (v === "bilanco") bilancoCiz();
@@ -1060,7 +1163,7 @@ $("#b-icerik").addEventListener("click", e => { const b = e.target.closest("#b-m
   const bb = D.bilanco[D.secili]; cubukCiz(bb, ceyrekler(bb.fiscal_period_current, 12), (D.harita[D.secili] || {}).sector === "Finance") });
 for (const [id, p] of [["#p-tl", "TL"], ["#p-usd", "USD"]]) $(id).addEventListener("click", () => {
   D.para = p; $("#p-tl").setAttribute("aria-pressed", p === "TL"); $("#p-usd").setAttribute("aria-pressed", p === "USD"); kaydet();
-  seritCiz(); listeCiz(); acilisCiz(); if (!$("#v-grafik").hidden) grafikCiz(false) });
+  seritCiz(); listeCiz(); acilisCiz(); favoriCiz(); if (!$("#v-grafik").hidden) grafikCiz(false) });
 matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { temaUygula(); if (!$("#v-bilanco").hidden) bilancoCiz() });
 
 // ---------------------------------------------------------------- başlat
