@@ -175,7 +175,10 @@ input[type="text"], input[type="date"], input[type="password"] { width: 100%; mi
   <!-- FAVORİLER (açılış ekranı) -->
   <section class="gorunum" id="v-favori">
     <div class="kutu">
-      <div class="baslik-hisse" style="align-items:center"><h2 style="margin:0">Favorilerim</h2>
+      <div class="segment" role="group" aria-label="Liste" id="fv-listeler" style="margin-bottom:10px">
+        <button type="button" data-l="favori" aria-pressed="true">Favorilerim</button><button type="button" data-l="takip" aria-pressed="false">Takip listesi</button>
+      </div>
+      <div class="baslik-hisse" style="align-items:center"><h2 style="margin:0" id="fv-baslik">Favorilerim</h2>
         <button type="button" class="dugme ikincil" id="fv-duzenle" style="padding:6px 12px;font-size:13px">Düzenle</button></div>
       <ul class="liste" id="fv-liste" style="margin-top:6px"><li class="durum">Fiyatlar yükleniyor…</li></ul>
       <p class="not" id="fv-not" style="margin-top:8px"></p>
@@ -1052,11 +1055,25 @@ bildirimDurum();
 // ---------------------------------------------------------------- favoriler
 // Açılışta ilk ekran. Öğeler "hisse:KOD", "altin:Tür", "fon:KOD"; telefonda saklanır. Hisse ve altın canlı
 // (30 sn), fonun canlı kaynağı yok (TEFAS dışarıya kapalı): Portföy'de girilmiş son fiyat ve TEFAS bağlantısı.
-const FV_ANAHTAR = "bistcep-favori";
-const FV_VARSAYILAN = ["hisse:ENDAE", "hisse:ASTOR", "hisse:HRKET", "hisse:TUPRS", "hisse:PGSUS", "hisse:KCHOL", "altin:Gram altın"];
-let FV = (() => { try { const v = JSON.parse(localStorage.getItem(FV_ANAHTAR) || "null"); if (Array.isArray(v)) return v } catch {} return [...FV_VARSAYILAN] })();
+// iki liste: kişisel favoriler ve takip listesi (ilk içerik: 10 yılda hiçbir dönemde USD bazında %15'ten fazla
+// kaybetmemiş 26 şirket + sınırdaki TUPRS, KCHOL — 2026-11-09 taraması); ikisi de düzenlenebilir, ayrı saklanır
+const FV_LISTELER = {
+  favori: { ad: "Favorilerim", anahtar: "bistcep-favori",
+    varsayilan: ["hisse:ENDAE", "hisse:ASTOR", "hisse:HRKET", "hisse:TUPRS", "hisse:PGSUS", "hisse:KCHOL", "altin:Gram altın"] },
+  takip: { ad: "Takip listesi", anahtar: "bistcep-takip", varsayilan: ["RYGYO", "RYSAS", "AYES", "CELHA", "ASELS", "USHOL", "KGYO", "DURDO", "KRONT", "DOCO", "TRMET", "GLYHO", "TRGYO", "VERUS", "BIMAS", "KERVN", "ENKAI", "CCOLA", "TAVHL", "PAGYO", "AYGAZ", "INDES", "AVGYO", "GARAN", "YKBNK", "AKSGY", "TUPRS", "KCHOL"].map(k => "hisse:" + k) } };
+let fvListe = (() => { try { return localStorage.getItem("bistcep-fv-aktif") === "takip" ? "takip" : "favori" } catch { return "favori" } })();
+const fvOku = l => { try { const v = JSON.parse(localStorage.getItem(FV_LISTELER[l].anahtar) || "null"); if (Array.isArray(v)) return v } catch {}
+  return [...FV_LISTELER[l].varsayilan] };
+let FV = fvOku(fvListe);
 let fvDuzen = false, fvTur = "hisse";
-const fvYaz = () => { try { localStorage.setItem(FV_ANAHTAR, JSON.stringify(FV)) } catch {} };
+const fvYaz = () => { try { localStorage.setItem(FV_LISTELER[fvListe].anahtar, JSON.stringify(FV)) } catch {} };
+function fvListeSec(l) {
+  fvListe = l; FV = fvOku(l); try { localStorage.setItem("bistcep-fv-aktif", l) } catch {}
+  document.querySelectorAll("#fv-listeler button").forEach(b => b.setAttribute("aria-pressed", b.dataset.l === l));
+  $("#fv-baslik").textContent = FV_LISTELER[l].ad; favoriCiz();
+}
+document.querySelectorAll("#fv-listeler button").forEach(b => b.addEventListener("click", () => fvListeSec(b.dataset.l)));
+setTimeout(() => fvListeSec(fvListe), 0);
 
 function altinGunluk(tur) {   // TL: (1 + ons değişimi) × (1 + kur değişimi) − 1; USD: ons değişimi
   const sembol = tur === "Gümüş (gram)" ? "TVC:SILVER" : "OANDA:XAUUSD", o = D.onsDeg?.[sembol];
@@ -1091,7 +1108,7 @@ function favoriCiz() {
       <div class="fiyat sayi">${fiyat == null ? "—" : sayi(fiyat, tur === "altin" || D.para === "USD" ? 2 : ondalik())}</div>
       ${fvDuzen ? duzen : `<div class="rozet sayi ${sinif(deg)}">${deg == null ? "—" : yuzde(deg)}</div>`}</li>`;
   });
-  $("#fv-liste").innerHTML = satirlar.join("") || `<li class="durum">Favori yok. "Düzenle" ile ekleyin.</li>`;
+  $("#fv-liste").innerHTML = satirlar.join("") || `<li class="durum">Bu liste boş. "Düzenle" ile ekleyin.</li>`;
   $("#fv-not").textContent = "Yüzdeler günlük değişim. Hisseye dokununca grafiği açılır. Hisse fiyatları ~15 dk gecikmeli; altın ve kur anlık.";
 }
 function fvOneriler() {
